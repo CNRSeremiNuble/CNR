@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0057A8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CNR Seguimiento">
+  <meta name="description" content="Ficha digital de seguimiento de proyectos de riego CNR Ley 18.450">
+
+  <title>CNR Seguimiento — Ficha Digital</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ── Banner de instalación PWA ──────────────────────── -->
+<div id="install-banner" class="install-banner">
+  <span>📱 Instale la app para usarla sin conexión en su tablet</span>
+  <button id="install-btn">Instalar</button>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────── -->
+<header class="app-header">
+  <div>
+    <div class="logo-text">CNR Seguimiento</div>
+    <div class="logo-sub">Ficha Digital · Ley 18.450</div>
+  </div>
+  <div class="header-spacer"></div>
+  <button id="sync-btn" class="sync-btn" title="Sincronizar con Google Drive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M23 4v6h-6M1 20v-6h6"/>
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+    </svg>
+    Sincronizar
+  </button>
+</header>
+
+<!-- ── Status bar ─────────────────────────────────────── -->
+<div class="status-bar">
+  <span id="status-dot" class="status-dot"></span>
+  <span id="status-text">Verificando conexión…</span>
+  <span style="margin-left:auto;opacity:.6;font-size:.7rem;">
+    CNR · Comisión Nacional de Riego · Chile
+  </span>
+</div>
+
+<!-- ── Layout principal ───────────────────────────────── -->
+<div class="main-layout">
+
+  <!-- Sidebar lista de registros -->
+  <aside class="records-sidebar" id="records-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">📋 Registros</div>
+      <button class="new-record-btn" id="new-record-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nueva Ficha
+      </button>
+      <input
+        type="search"
+        id="search-input"
+        class="search-input"
+        placeholder="Buscar por beneficiario, código…"
+        autocomplete="off"
+      >
+    </div>
+    <div class="records-list" id="records-list">
+      <!-- Registros generados por JS -->
+    </div>
+  </aside>
+
+  <!-- Área del formulario -->
+  <div class="form-area" id="form-area">
+
+    <!-- Estado: sin registro seleccionado -->
+    <div id="no-record-msg" class="no-record-selected">
+      <div class="big-icon">📄</div>
+      <h2>Seleccione o cree una ficha</h2>
+      <p>Use el panel izquierdo para abrir un registro existente o cree uno nuevo con el botón <strong>"Nueva Ficha"</strong>.</p>
+    </div>
+
+    <!-- Wrapper del formulario (oculto hasta seleccionar registro) -->
+    <div id="form-wrapper" style="display:none; flex-direction:column; gap:24px; flex:1;">
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 1: IDENTIFICACIÓN DEL PROYECTO
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">🗂️</span>
+          <h2>Identificación del Proyecto</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group">
+              <label class="field-label" for="f_codigo_proyecto">
+                Código Proyecto<span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="f_codigo_proyecto"
+                class="field-input mono"
+                placeholder="Ej: 08-2022-16-004"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_nro_concurso">N° Concurso</label>
+              <input
+                type="text"
+                id="f_nro_concurso"
+                class="field-input mono"
+                placeholder="Ej: 08-2022"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_fecha_recepcion">Fecha Recepción Técnica</label>
+              <input type="date" id="f_fecha_recepcion" class="field-input">
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_fecha_visita">
+                Fecha de Visita<span class="required">*</span>
+              </label>
+              <input type="date" id="f_fecha_visita" class="field-input">
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_fecha_pago">Fecha de Pago</label>
+              <input type="date" id="f_fecha_pago" class="field-input">
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_nro_bono">N° Bono</label>
+              <input
+                type="text"
+                id="f_nro_bono"
+                class="field-input mono"
+                placeholder="Ej: 37173"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 2: DATOS DEL BENEFICIARIO Y PREDIO
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">👤</span>
+          <h2>Beneficiario y Predio</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid cols-1">
+
+            <div class="field-group">
+              <label class="field-label" for="f_beneficiario">
+                Beneficiario (Razón Social)<span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="f_beneficiario"
+                class="field-input"
+                placeholder="Ej: Agrícola Francisco Yavar Marcenaro EIRL"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_predio">Predio</label>
+              <input
+                type="text"
+                id="f_predio"
+                class="field-input"
+                placeholder="Ej: Parcela N°1 del Fundo Los Puquios de Talquipen"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_roles_avaluo">Rol(es) de Avalúo</label>
+              <input
+                type="text"
+                id="f_roles_avaluo"
+                class="field-input mono"
+                placeholder="Ej: 00099-00082"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+
+          <!-- División geográfica -->
+          <div class="divider" style="margin:16px 0;"></div>
+          <div class="field-grid cols-3">
+
+            <div class="field-group">
+              <label class="field-label" for="f_region">Región</label>
+              <select id="f_region" class="field-select">
+                <option value="">— Seleccione —</option>
+                <option value="Arica y Parinacota">Arica y Parinacota</option>
+                <option value="Tarapacá">Tarapacá</option>
+                <option value="Antofagasta">Antofagasta</option>
+                <option value="Atacama">Atacama</option>
+                <option value="Coquimbo">Coquimbo</option>
+                <option value="Valparaíso">Valparaíso</option>
+                <option value="Metropolitana">Metropolitana</option>
+                <option value="O'Higgins">O'Higgins</option>
+                <option value="Maule">Maule</option>
+                <option value="Ñuble">Ñuble</option>
+                <option value="Biobío">Biobío</option>
+                <option value="La Araucanía">La Araucanía</option>
+                <option value="Los Ríos">Los Ríos</option>
+                <option value="Los Lagos">Los Lagos</option>
+                <option value="Aysén">Aysén</option>
+                <option value="Magallanes">Magallanes</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_provincia">Provincia</label>
+              <input
+                type="text"
+                id="f_provincia"
+                class="field-input"
+                placeholder="Ej: Punilla"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_comuna">Comuna</label>
+              <input
+                type="text"
+                id="f_comuna"
+                class="field-input"
+                placeholder="Ej: Coihueco"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 3: COORDENADAS UTM
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📍</span>
+          <h2>Coordenadas UTM</h2>
+        </div>
+        <div class="section-body">
+          <div class="utm-grid">
+
+            <div class="field-group">
+              <label class="field-label" for="f_utm_este">Este (X)</label>
+              <input
+                type="number"
+                id="f_utm_este"
+                class="field-input mono"
+                placeholder="Ej: 237065"
+                step="0.01"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_utm_norte">Norte (Y)</label>
+              <input
+                type="number"
+                id="f_utm_norte"
+                class="field-input mono"
+                placeholder="Ej: 5940887"
+                step="0.01"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_utm_datum">Datum</label>
+              <select id="f_utm_datum" class="field-select">
+                <option value="WGS 84">WGS 84</option>
+                <option value="PSAD56">PSAD56</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_utm_huso">Huso</label>
+              <select id="f_utm_huso" class="field-select">
+                <option value="19">19</option>
+                <option value="18">18</option>
+              </select>
+            </div>
+
+          </div>
+
+          <div style="margin-top:14px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <button id="gps-btn" class="utm-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>
+                <path d="M12 5a7 7 0 100 14A7 7 0 0012 5z"/>
+              </svg>
+              Obtener GPS
+            </button>
+            <span style="font-size:.78rem;color:var(--gray-500);">
+              Captura automática desde GPS del dispositivo (WGS84 → UTM Zona 19)
+            </span>
+          </div>
+
+          <div class="divider" style="margin:16px 0;"></div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label" for="f_uso">Uso</label>
+              <input
+                type="text"
+                id="f_uso"
+                class="field-input"
+                placeholder="Ej: 19"
+                autocomplete="off"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 4: CULTIVOS
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">🌱</span>
+          <h2>Cultivos</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label" for="f_cultivo_inicial">Cultivo Inicial</label>
+              <input
+                type="text"
+                id="f_cultivo_inicial"
+                class="field-input"
+                placeholder="Ej: Frambuesa"
+                autocomplete="off"
+              >
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="f_cultivo_actual">Cultivo Actual</label>
+              <input
+                type="text"
+                id="f_cultivo_actual"
+                class="field-input"
+                placeholder="Ej: Frambuesa"
+                autocomplete="off"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 5: ANTECEDENTES
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📝</span>
+          <h2>Antecedentes</h2>
+        </div>
+        <div class="section-body">
+          <div class="dynamic-list" id="antecedentes-list">
+            <!-- Ítems generados por JS -->
+          </div>
+          <div style="margin-top:12px;">
+            <button id="add-antecedente" class="add-item-btn">
+              + Agregar antecedente
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 6: OBSERVACIONES TÉCNICAS
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">🔧</span>
+          <h2>Observaciones Técnicas</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-group">
+            <label class="field-label" for="f_observaciones_tecnicas">
+              Descripción de la inspección técnica
+            </label>
+            <textarea
+              id="f_observaciones_tecnicas"
+              class="field-textarea"
+              rows="5"
+              placeholder="Describa el resultado de la inspección de inventario y equipos de riego…"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 7: TIEMPO DE FUNCIONAMIENTO + OBSERVACIONES GENERALES
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">⏱️</span>
+          <h2>Estado General</h2>
+        </div>
+        <div class="section-body">
+
+          <div class="field-group" style="margin-bottom:24px;">
+            <label class="field-label">Tiempo de Funcionamiento de Obra</label>
+            <div class="tiempo-row">
+              <input
+                type="number"
+                id="f_tiempo_funcionamiento"
+                class="field-input tiempo-input"
+                min="0"
+                max="99"
+                step="1"
+                placeholder="0"
+              >
+              <span class="tiempo-unit">años</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Observaciones Generales</label>
+            <div class="dynamic-list" id="obs-generales-list">
+              <!-- Ítems generados por JS -->
+            </div>
+            <div style="margin-top:12px;">
+              <button id="add-obs-general" class="add-item-btn">
+                + Agregar observación
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 8: CUMPLE CON EL OBJETIVO
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">✅</span>
+          <h2>Cumple con el Objetivo</h2>
+        </div>
+        <div class="section-body">
+          <div class="cumple-group">
+            <label class="cumple-option si-opt">
+              <input type="radio" name="cumple_objetivo" value="SI">
+              <div class="opt-icon">✅</div>
+              <div class="opt-label">SÍ</div>
+            </label>
+            <label class="cumple-option no-opt">
+              <input type="radio" name="cumple_objetivo" value="NO">
+              <div class="opt-icon">❌</div>
+              <div class="opt-label">NO</div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 9: FOTOS
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📷</span>
+          <h2>Registro Fotográfico</h2>
+        </div>
+        <div class="section-body photos-section">
+
+          <div class="photo-actions">
+            <button id="camera-btn" class="photo-btn camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              Tomar Foto
+            </button>
+            <button id="gallery-btn" class="photo-btn gallery">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              Agregar desde Galería
+            </button>
+          </div>
+
+          <div class="photo-limit" id="photo-counter">0 / 5 fotos</div>
+
+          <div class="photos-grid" id="photos-grid">
+            <!-- Thumbnails generados por JS -->
+          </div>
+
+          <div style="font-size:.78rem;color:var(--gray-500);margin-top:8px;line-height:1.6;">
+            💡 Las fotos se comprimen automáticamente (~300 KB c/u) y se sincronizan a Google Drive
+            en carpetas organizadas por código de proyecto.
+          </div>
+        </div>
+      </div>
+
+      <!-- Espaciado inferior -->
+      <div style="height:20px;"></div>
+
+    </div><!-- /form-wrapper -->
+  </div><!-- /form-area -->
+</div><!-- /main-layout -->
+
+<!-- ── Barra de acciones (guardar / exportar) ─────────── -->
+<div class="action-bar" id="action-bar" style="display:none;">
+  <span class="record-id-display" id="record-id-display"></span>
+
+  <button id="export-json-btn" class="action-btn secondary" title="Exportar como JSON">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+    </svg>
+    JSON
+  </button>
+
+  <button id="export-csv-btn" class="action-btn secondary" title="Exportar como CSV (para Access)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="8" y1="13" x2="16" y2="13"/>
+      <line x1="8" y1="17" x2="16" y2="17"/>
+    </svg>
+    CSV / Access
+  </button>
+
+  <button id="save-btn" class="action-btn primary">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>
+    Guardar Ficha
+  </button>
+</div>
+
+<!-- ── Toast container ────────────────────────────────── -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ── Scripts ────────────────────────────────────────── -->
+<script src="js/camera.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+  // Mostrar action bar cuando haya registro activo
+  const _origLoad = loadRecordToForm;
+  document.addEventListener('DOMContentLoaded', () => {
+    const actionBar = document.getElementById('action-bar');
+
+    // Parchamos loadRecordToForm para mostrar la barra
+    const origFn = window.loadRecordToForm;
+    if (origFn) {
+      // La función ya está definida en app.js, vinculamos el observer vía MutationObserver
+    }
+
+    // Observar cuándo aparece el form-wrapper
+    const observer = new MutationObserver(() => {
+      const wrapper = document.getElementById('form-wrapper');
+      if (wrapper && wrapper.style.display !== 'none') {
+        actionBar.style.display = 'flex';
+      } else {
+        actionBar.style.display = 'none';
+      }
+    });
+
+    const wrapper = document.getElementById('form-wrapper');
+    if (wrapper) {
+      observer.observe(wrapper, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    // Registrar Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('[SW] Registrado:', reg.scope))
+        .catch(err => console.warn('[SW] Error:', err));
+    }
+  });
+</script>
+
+</body>
+</html>
