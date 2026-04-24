@@ -860,7 +860,7 @@
 
   // Registrar Service Worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
+      navigator.serviceWorker.register('/CNR/service-worker.js')
         .then(reg => console.log('[SW] Registrado:', reg.scope))
         .catch(err => console.warn('[SW] Error:', err));
     }
