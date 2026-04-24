@@ -870,3 +870,170 @@ body {
   background: var(--gray-200);
   margin: 8px 0;
 }
+
+/* ══════════════════════════════════════════════════════════
+   S-PEN / STYLUS OPTIMIZATIONS
+   Samsung Galaxy Tab con S-Pen — precisión de puntero fino
+
+   Detecta dispositivos con puntero fino (stylus/mouse).
+   En tablet Android con dedo: pointer=coarse (no aplica).
+   Con S-Pen activo:           pointer=fine  (aplica todo).
+   ══════════════════════════════════════════════════════════ */
+@media (pointer: fine) {
+
+  /* ── Variables S-Pen: campos más compactos ─────────────── */
+  :root {
+    --touch-min:  36px;   /* altura mínima reducida (era 48px) */
+    --spen-active: 1;
+  }
+
+  /* ── Cursor de precisión global ─────────────────────────── */
+  * { cursor: default; }
+  input, textarea, select,
+  button, label, a,
+  .record-card, .cumple-option,
+  .tab-btn, .photo-thumb { cursor: pointer; }
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="search"],
+  textarea { cursor: text; }
+
+  /* ── Campos de formulario: más compactos ────────────────── */
+  .field-input,
+  .field-select,
+  .field-textarea {
+    padding: 8px 12px;
+    font-size: .95rem;
+    min-height: var(--touch-min);
+  }
+  .field-textarea { min-height: 80px; }
+
+  /* ── Hover en campos: borde azul al acercar S-Pen ────────── */
+  .field-input:hover,
+  .field-select:hover,
+  .field-textarea:hover {
+    border-color: var(--cnr-blue);
+    background: var(--cnr-blue-light);
+    transition: border-color .15s, background .15s;
+  }
+
+  /* ── Hover en botones ───────────────────────────────────── */
+  .action-btn:hover,
+  .photo-btn:hover,
+  .utm-btn:hover,
+  .add-item-btn:hover,
+  .new-record-btn:hover,
+  .sync-btn:hover,
+  .tab-btn:hover {
+    filter: brightness(1.08);
+    transition: filter .15s;
+  }
+
+  /* ── Hover en tarjetas de registro ─────────────────────── */
+  .record-card:hover {
+    border-color: var(--cnr-blue);
+    background: var(--cnr-blue-light);
+    transform: translateX(2px);
+    transition: all .15s;
+  }
+
+  /* ── Hover en opciones Cumple/No cumple ─────────────────── */
+  .cumple-option.si-opt:hover {
+    border-color: var(--cnr-green);
+    background: var(--cnr-green-bg);
+    transition: all .15s;
+  }
+  .cumple-option.no-opt:hover {
+    border-color: var(--cnr-red);
+    background: var(--cnr-red-bg);
+    transition: all .15s;
+  }
+
+  /* ── Hover en thumbnails de fotos ───────────────────────── */
+  .photo-thumb:hover .photo-thumb-overlay { opacity: 1; }
+  .photo-thumb:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-md);
+    transition: transform .15s, box-shadow .15s;
+  }
+
+  /* ── Items dinámicos: botón eliminar visible en hover ────── */
+  .dynamic-item .item-remove {
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .dynamic-item:hover .item-remove { opacity: 1; }
+
+  /* ── Grid de campos: más columnas aprovechando pantalla ──── */
+  .field-grid         { gap: 12px; }
+  .field-grid.cols-3  { grid-template-columns: repeat(3, 1fr); }
+  .utm-grid           { grid-template-columns: 1fr 1fr 110px 90px; gap: 10px; }
+
+  /* ── Secciones: padding reducido ────────────────────────── */
+  .section-body       { padding: 16px; }
+  .form-area          { padding: 16px 20px; }
+
+  /* ── Tabs: más compactas ────────────────────────────────── */
+  .tab-btn            { padding: 10px 16px; font-size: .82rem; }
+
+  /* ── Header: ligeramente más delgado ────────────────────── */
+  .app-header         { height: 52px; }
+
+  /* ── Action bar: más compacta ───────────────────────────── */
+  .action-bar         { padding: 10px 20px; }
+  .action-btn         { padding: 9px 18px; font-size: .85rem; }
+
+  /* ── Tiempo de funcionamiento ───────────────────────────── */
+  .tiempo-input       { font-size: 1.2rem; width: 88px; }
+
+  /* ── Listas dinámicas: textarea más corta ───────────────── */
+  .dynamic-item textarea { min-height: 48px; font-size: .9rem; padding: 8px 10px; }
+
+  /* ── Sidebar más angosta (S-Pen es preciso) ─────────────── */
+  .records-sidebar    { width: 270px; }
+  .record-card        { padding: 10px; }
+  .record-card-name   { font-size: .82rem; }
+
+  /* ── Fotos grid: más columnas ───────────────────────────── */
+  .photos-grid        { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+
+  /* ── Indicador visual S-Pen activo (esquina inferior) ────── */
+  body::after {
+    content: '✒ S-Pen';
+    position: fixed;
+    bottom: 72px;
+    right: 12px;
+    background: var(--cnr-blue);
+    color: white;
+    font-size: .65rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    opacity: .5;
+    pointer-events: none;
+    z-index: 9999;
+    letter-spacing: .04em;
+  }
+
+} /* fin @media (pointer: fine) */
+
+/* ══════════════════════════════════════════════════════════
+   S-PEN: ajuste adicional para landscape en Galaxy Tab
+   (1280px+ ancho, que es la resolución típica del Tab S)
+   ══════════════════════════════════════════════════════════ */
+@media (pointer: fine) and (min-width: 1024px) {
+
+  /* Aprovechar el ancho extra del Tab S en landscape */
+  .main-layout        { max-width: 1400px; }
+  .records-sidebar    { width: 290px; }
+  .field-grid         { grid-template-columns: repeat(2, 1fr); }
+  .field-grid.cols-3  { grid-template-columns: repeat(3, 1fr); }
+
+  /* Form area con más espacio lateral */
+  .form-area          { padding: 20px 28px; }
+
+  /* Secciones con padding generoso */
+  .section-body       { padding: 18px 22px; }
+
+}
