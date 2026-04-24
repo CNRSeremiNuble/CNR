@@ -1,0 +1,40 @@
+{
+  "name": "CNR Seguimiento — Ficha Digital Ley 18.450",
+  "short_name": "CNR Seguimiento",
+  "description": "Ficha digital de seguimiento de proyectos de riego CNR - Comisión Nacional de Riego Chile",
+  "start_url": "/CNR/index.html",
+  "scope": "/CNR/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0057A8",
+  "theme_color": "#0057A8",
+  "lang": "es-CL",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/CNR/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/CNR/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/CNR/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/CNR/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "prefer_related_applications": false
+}
