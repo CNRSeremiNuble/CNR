@@ -1,12 +1,13 @@
 /**
  * app.js — Lógica principal CNR Seguimiento PWA
  * IndexedDB · Exportación JSON/CSV · Google Drive OAuth2
+ * v2.0 — Fechas ISO, rutas relativas fotos, exportar todos, indicador modificación
  */
 
 'use strict';
 
 /* ══════════════════════════════════════════════════════════
-   CONFIGURACIÓN — editar antes de desplegar
+   CONFIGURACIÓN
    ══════════════════════════════════════════════════════════ */
 const CONFIG = {
   GOOGLE_CLIENT_ID:  '353831203919-9uf4jmk8he5df4dvvpdoq0dle1jmeiju.apps.googleusercontent.com',
@@ -14,67 +15,87 @@ const CONFIG = {
   DB_NAME:           'cnr_seguimiento',
   DB_VERSION:        1,
   STORE_NAME:        'registros',
+  TIPO_FICHA:        'Seguimiento CNR',
 };
 
 /* ══════════════════════════════════════════════════════════
    ESTADO GLOBAL
    ══════════════════════════════════════════════════════════ */
 const State = {
-  db:              null,
-  currentRecord:   null,   // registro activo en el formulario
-  records:         [],     // lista en memoria
-  isOnline:        navigator.onLine,
-  isSyncing:       false,
-  driveToken:      null,
-  driveFolderId:   null,
-  installPrompt:   null,
+  db:            null,
+  currentRecord: null,
+  records:       [],
+  isOnline:      navigator.onLine,
+  isSyncing:     false,
+  driveToken:    null,
+  installPrompt: null,
 };
 
 /* ══════════════════════════════════════════════════════════
-   MODELO DE DATOS — campos del formulario CNR
+   MODELO DE DATOS
    ══════════════════════════════════════════════════════════ */
 function createEmptyRecord() {
+  const today = dateToISO(new Date());
   return {
-    // Identificadores
-    _id:                   crypto.randomUUID(),
-    _created:              new Date().toISOString(),
-    _modified:             new Date().toISOString(),
-    _synced:               false,
-    _syncedAt:             null,
+    _id:                     crypto.randomUUID(),
+    _created:                new Date().toISOString(),
+    _modified:               new Date().toISOString(),
+    _modified_count:         0,
+    _synced:                 false,
+    _syncedAt:               null,
+    tipo_ficha:              CONFIG.TIPO_FICHA,
 
-    // Datos del proyecto
-    codigo_proyecto:       '',
-    nro_concurso:          '',
-    fecha_recepcion:       '',
-    beneficiario:          '',
-    predio:                '',
-    roles_avaluo:          '',
-    comuna:                '',
-    provincia:             '',
-    region:                '',
-    utm_este:              '',
-    utm_norte:             '',
-    utm_datum:             'WGS 84',
-    utm_huso:              '19',
-    uso:                   '',
-    fecha_pago:            '',
-    nro_bono:              '',
-    fecha_visita:          new Date().toISOString().split('T')[0],
+    codigo_proyecto:         '',
+    nro_concurso:            '',
+    fecha_recepcion:         '',
+    beneficiario:            '',
+    predio:                  '',
+    roles_avaluo:            '',
+    comuna:                  '',
+    provincia:               '',
+    region:                  'Ñuble',
+    utm_este:                '',
+    utm_norte:               '',
+    utm_datum:               'WGS 84',
+    utm_huso:                '19',
+    fecha_pago:              '',
+    nro_bono:                '',
+    fecha_visita:            today,
 
-    // Cultivos
-    cultivo_inicial:       '',
-    cultivo_actual:        '',
+    cultivo_inicial:         '',
+    cultivo_actual:          '',
 
-    // Campos de texto
-    antecedentes:          [''],   // array de strings
-    observaciones_tecnicas:'',
-    tiempo_funcionamiento: '',
-    observaciones_generales: [''], // array de strings
-    cumple_objetivo:       '',     // 'SI' | 'NO'
+    antecedentes:            [''],
+    observaciones_tecnicas:  '',
+    tiempo_funcionamiento:   '',
+    observaciones_generales: [''],
+    cumple_objetivo:         '',
 
-    // Fotos
-    fotos: [],                     // array de objetos foto
+    fotos:                   [],
   };
+}
+
+/* ══════════════════════════════════════════════════════════
+   UTILIDADES DE FECHA
+   Internamente: AAAA-MM-DD · Formulario: DD/MM/AAAA
+   ══════════════════════════════════════════════════════════ */
+function dateToISO(d) {
+  if (!d || isNaN(d)) return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function displayToISO(str) {
+  if (!str) return '';
+  const p = str.split('/');
+  if (p.length !== 3 || p[2].length !== 4) return str;
+  return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+}
+
+function isoToDisplay(str) {
+  if (!str) return '';
+  const p = str.split('-');
+  if (p.length !== 3) return str;
+  return `${p[2]}/${p[1]}/${p[0]}`;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -83,9 +104,8 @@ function createEmptyRecord() {
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
-
     req.onupgradeneeded = (e) => {
-      const db    = e.target.result;
+      const db = e.target.result;
       if (!db.objectStoreNames.contains(CONFIG.STORE_NAME)) {
         const store = db.createObjectStore(CONFIG.STORE_NAME, { keyPath: '_id' });
         store.createIndex('codigo_proyecto', 'codigo_proyecto', { unique: false });
@@ -93,13 +113,12 @@ function openDB() {
         store.createIndex('_synced',         '_synced',         { unique: false });
       }
     };
-
     req.onsuccess = (e) => resolve(e.target.result);
     req.onerror   = (e) => reject(e.target.error);
   });
 }
 
-async function dbGetAll() {
+function dbGetAll() {
   return new Promise((resolve, reject) => {
     const tx  = State.db.transaction(CONFIG.STORE_NAME, 'readonly');
     const req = tx.objectStore(CONFIG.STORE_NAME).getAll();
@@ -108,19 +127,10 @@ async function dbGetAll() {
   });
 }
 
-async function dbPut(record) {
+function dbPut(record) {
   return new Promise((resolve, reject) => {
     const tx  = State.db.transaction(CONFIG.STORE_NAME, 'readwrite');
     const req = tx.objectStore(CONFIG.STORE_NAME).put(record);
-    req.onsuccess = () => resolve();
-    req.onerror   = (e) => reject(e.target.error);
-  });
-}
-
-async function dbDelete(id) {
-  return new Promise((resolve, reject) => {
-    const tx  = State.db.transaction(CONFIG.STORE_NAME, 'readwrite');
-    const req = tx.objectStore(CONFIG.STORE_NAME).delete(id);
     req.onsuccess = () => resolve();
     req.onerror   = (e) => reject(e.target.error);
   });
@@ -131,138 +141,133 @@ async function dbDelete(id) {
    ══════════════════════════════════════════════════════════ */
 async function saveCurrentRecord() {
   if (!State.currentRecord) return;
-
-  // Leer valores del formulario
+  const isNew = State.currentRecord._modified_count === 0;
   collectFormValues();
-
-  State.currentRecord._modified = new Date().toISOString();
-  State.currentRecord._synced   = false;
-
+  State.currentRecord._modified       = new Date().toISOString();
+  State.currentRecord._modified_count = (State.currentRecord._modified_count || 0) + 1;
+  State.currentRecord._synced         = false;
   await dbPut(State.currentRecord);
   State.records = await dbGetAll();
   renderRecordsList();
-  showToast('Registro guardado', 'success');
-
-  // Intentar sync si hay conexión
+  showToast(isNew ? 'Ficha guardada ✓' : 'Ficha actualizada ✓', 'success');
   if (State.isOnline) triggerSync();
 }
 
 function collectFormValues() {
   const r = State.currentRecord;
-
-  // Campos simples
   const simpleFields = [
-    'codigo_proyecto','nro_concurso','fecha_recepcion','beneficiario',
-    'predio','roles_avaluo','comuna','provincia','region',
-    'utm_este','utm_norte','utm_datum','utm_huso','uso',
-    'fecha_pago','nro_bono','fecha_visita',
-    'cultivo_inicial','cultivo_actual','observaciones_tecnicas',
-    'tiempo_funcionamiento',
+    'codigo_proyecto','nro_concurso','beneficiario',
+    'predio','roles_avaluo','region',
+    'utm_este','utm_norte','utm_datum','utm_huso',
+    'nro_bono','cultivo_inicial','cultivo_actual',
+    'observaciones_tecnicas','tiempo_funcionamiento',
   ];
-
   simpleFields.forEach(field => {
     const el = document.getElementById(`f_${field}`);
     if (el) r[field] = el.value.trim();
   });
 
-  // Cumple objetivo
+  const provEl = document.getElementById('f_provincia');
+  const comEl  = document.getElementById('f_comuna');
+  if (provEl) r.provincia = provEl.value;
+  if (comEl)  r.comuna    = comEl.value;
+
+  ['fecha_recepcion','fecha_visita','fecha_pago'].forEach(field => {
+    const el = document.getElementById(`f_${field}`);
+    if (el) r[field] = displayToISO(el.value.trim());
+  });
+
   const cumpleChecked = document.querySelector('input[name="cumple_objetivo"]:checked');
   r.cumple_objetivo = cumpleChecked ? cumpleChecked.value : '';
 
-  // Antecedentes (lista dinámica)
-  r.antecedentes = collectDynamicList('antecedentes-list');
-
-  // Observaciones generales (lista dinámica)
+  r.antecedentes            = collectDynamicList('antecedentes-list');
   r.observaciones_generales = collectDynamicList('obs-generales-list');
 }
 
 function collectDynamicList(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return [''];
-  return Array.from(container.querySelectorAll('textarea'))
-    .map(ta => ta.value.trim())
-    .filter(v => v.length > 0);
+  const vals = Array.from(container.querySelectorAll('textarea'))
+    .map(ta => ta.value.trim()).filter(v => v.length > 0);
+  return vals.length ? vals : [''];
 }
 
 function loadRecordToForm(record) {
-  State.currentRecord = JSON.parse(JSON.stringify(record)); // copia profunda
+  State.currentRecord = JSON.parse(JSON.stringify(record));
 
   const simpleFields = [
-    'codigo_proyecto','nro_concurso','fecha_recepcion','beneficiario',
-    'predio','roles_avaluo','comuna','provincia','region',
-    'utm_este','utm_norte','utm_datum','utm_huso','uso',
-    'fecha_pago','nro_bono','fecha_visita',
-    'cultivo_inicial','cultivo_actual','observaciones_tecnicas',
-    'tiempo_funcionamiento',
+    'codigo_proyecto','nro_concurso','beneficiario',
+    'predio','roles_avaluo','region',
+    'utm_este','utm_norte','utm_datum','utm_huso',
+    'nro_bono','cultivo_inicial','cultivo_actual',
+    'observaciones_tecnicas','tiempo_funcionamiento',
   ];
-
   simpleFields.forEach(field => {
     const el = document.getElementById(`f_${field}`);
     if (el) el.value = record[field] || '';
   });
 
-  // Cumple objetivo
-  const cumpleInput = document.querySelector(`input[name="cumple_objetivo"][value="${record.cumple_objetivo}"]`);
-  if (cumpleInput) {
-    cumpleInput.checked = true;
-    updateCumpleVisual(record.cumple_objetivo);
-  } else {
-    document.querySelectorAll('.cumple-option').forEach(o => o.classList.remove('selected'));
+  ['fecha_recepcion','fecha_visita','fecha_pago'].forEach(field => {
+    const el = document.getElementById(`f_${field}`);
+    if (el) el.value = isoToDisplay(record[field] || '');
+  });
+
+  const provEl = document.getElementById('f_provincia');
+  if (provEl && record.provincia) {
+    provEl.value = record.provincia;
+    if (window.updateComunas) window.updateComunas(record.provincia);
   }
+  setTimeout(() => {
+    const comEl = document.getElementById('f_comuna');
+    if (comEl && record.comuna) comEl.value = record.comuna;
+  }, 60);
 
-  // Listas dinámicas
-  renderDynamicList('antecedentes-list', record.antecedentes || ['']);
-  renderDynamicList('obs-generales-list', record.observaciones_generales || ['']);
+  const cumpleInput = document.querySelector(`input[name="cumple_objetivo"][value="${record.cumple_objetivo}"]`);
+  if (cumpleInput) { cumpleInput.checked = true; updateCumpleVisual(record.cumple_objetivo); }
+  else document.querySelectorAll('.cumple-option').forEach(o => o.classList.remove('selected'));
 
-  // Fotos
+  renderDynamicList('antecedentes-list',   record.antecedentes || ['']);
+  renderDynamicList('obs-generales-list',  record.observaciones_generales || ['']);
   renderPhotos();
 
-  // Actualizar id display
   const idDisplay = document.getElementById('record-id-display');
   if (idDisplay) {
-    idDisplay.textContent = `ID: ${record._id.split('-')[0]} · ${record._synced ? '✓ Sincronizado' : '⏳ Pendiente sync'}`;
+    const modCount = record._modified_count || 0;
+    const modLabel = modCount > 1
+      ? `<span class="mod-indicator">✱ Modificado ${modCount - 1}x · ${formatDateShort(record._modified)}</span>`
+      : '';
+    const syncLabel = record._synced ? '✓ Sync' : '⏳ Pendiente';
+    idDisplay.innerHTML = `<span style="opacity:.6">ID: ${record._id.split('-')[0]}</span> ${modLabel} <span>${syncLabel}</span>`;
   }
 
-  // Mostrar area de formulario
   document.getElementById('no-record-msg').style.display = 'none';
   document.getElementById('form-wrapper').style.display  = 'flex';
 }
 
 /* ══════════════════════════════════════════════════════════
-   LISTAS DINÁMICAS (antecedentes / observaciones)
+   LISTAS DINÁMICAS
    ══════════════════════════════════════════════════════════ */
 function renderDynamicList(containerId, items) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = '';
-
-  const list = items.length > 0 ? items : [''];
-  list.forEach((text, i) => addDynamicItem(container, text, i + 1));
+  (items.length ? items : ['']).forEach((text, i) => addDynamicItem(container, text, i + 1));
 }
 
 function addDynamicItem(container, text = '', number = null) {
-  const items    = container.querySelectorAll('.dynamic-item');
-  const itemNum  = number || items.length + 1;
-  const div      = document.createElement('div');
-  div.className  = 'dynamic-item';
-  div.innerHTML  = `
+  const itemNum = number || container.querySelectorAll('.dynamic-item').length + 1;
+  const div     = document.createElement('div');
+  div.className = 'dynamic-item';
+  div.innerHTML = `
     <div class="item-number">${itemNum}</div>
     <textarea placeholder="Escriba aquí...">${escapeHtml(text)}</textarea>
     <button class="item-remove" title="Eliminar ítem">✕</button>
   `;
-
   div.querySelector('.item-remove').addEventListener('click', () => {
     div.remove();
-    renumberDynamicList(container);
+    container.querySelectorAll('.item-number').forEach((el, i) => { el.textContent = i + 1; });
   });
-
   container.appendChild(div);
-}
-
-function renumberDynamicList(container) {
-  container.querySelectorAll('.item-number').forEach((el, i) => {
-    el.textContent = i + 1;
-  });
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -270,16 +275,12 @@ function renumberDynamicList(container) {
    ══════════════════════════════════════════════════════════ */
 function renderPhotos() {
   const container = document.getElementById('photos-grid');
-  const photos    = State.currentRecord ? State.currentRecord.fotos || [] : [];
+  const photos    = State.currentRecord?.fotos || [];
   const counter   = document.getElementById('photo-counter');
-
   if (counter) counter.textContent = `${photos.length} / ${CameraModule.MAX_PHOTOS} fotos`;
-
-  CameraModule.renderPhotoGrid(
-    photos,
-    container,
-    (photoId) => removePhoto(photoId),
-    (photoId, caption) => updatePhotoCaption(photoId, caption),
+  CameraModule.renderPhotoGrid(photos, container,
+    (id) => { State.currentRecord.fotos = State.currentRecord.fotos.filter(f => f.id !== id); renderPhotos(); },
+    (id, caption) => { const f = State.currentRecord.fotos.find(f => f.id === id); if (f) f.caption = caption; }
   );
 }
 
@@ -291,690 +292,393 @@ function addPhoto(photoObj) {
   showToast(`Foto agregada (${Math.round(photoObj.sizeKB)} KB)`, 'success');
 }
 
-function removePhoto(photoId) {
-  if (!State.currentRecord) return;
-  State.currentRecord.fotos = State.currentRecord.fotos.filter(f => f.id !== photoId);
-  renderPhotos();
-}
-
-function updatePhotoCaption(photoId, caption) {
-  if (!State.currentRecord) return;
-  const foto = State.currentRecord.fotos.find(f => f.id === photoId);
-  if (foto) foto.caption = caption;
-}
-
 /* ══════════════════════════════════════════════════════════
-   GEOLOCALIZACIÓN
+   GEOLOCALIZACIÓN Y UTM
    ══════════════════════════════════════════════════════════ */
 function getGeoLocation() {
-  if (!navigator.geolocation) {
-    showToast('Geolocalización no disponible', 'error');
-    return;
-  }
+  if (!navigator.geolocation) { showToast('GPS no disponible', 'error'); return; }
   showToast('Obteniendo ubicación GPS…', 'info');
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-
-      // Conversión decimal a UTM simplificada (zona 19S para Chile central)
-      // Para producción usar una librería proj4js completa
-      const { easting, northing } = latLonToUTM(lat, lon);
-
-      const elEste  = document.getElementById('f_utm_este');
-      const elNorte = document.getElementById('f_utm_norte');
-      if (elEste)  elEste.value  = easting.toFixed(0);
-      if (elNorte) elNorte.value = northing.toFixed(0);
-
+      const { easting, northing } = latLonToUTM(pos.coords.latitude, pos.coords.longitude);
+      document.getElementById('f_utm_este').value  = easting.toFixed(0);
+      document.getElementById('f_utm_norte').value = northing.toFixed(0);
       if (State.currentRecord) {
         State.currentRecord.utm_este  = easting.toFixed(0);
         State.currentRecord.utm_norte = northing.toFixed(0);
       }
-      showToast('Coordenadas obtenidas', 'success');
+      showToast('Coordenadas GPS obtenidas ✓', 'success');
     },
-    (err) => {
-      showToast('No se pudo obtener la ubicación', 'error');
-      console.error(err);
-    },
+    (err) => { showToast('No se pudo obtener la ubicación', 'error'); console.error(err); },
     { enableHighAccuracy: true, timeout: 15000 }
   );
 }
 
-/**
- * Conversión WGS84 → UTM (zona 19H/19S, hemisferio sur)
- * Aproximación suficiente para terreno; para mayor precisión usar proj4.js
- */
 function latLonToUTM(lat, lon) {
-  const a  = 6378137.0;
-  const f  = 1 / 298.257223563;
-  const b  = a * (1 - f);
-  const e2 = 1 - (b * b) / (a * a);
-  const k0 = 0.9996;
-
-  const latR = (lat * Math.PI) / 180;
-  const lonR = (lon * Math.PI) / 180;
-
-  // Meridiano central zona 19 = -69°
-  const lon0R = (-69 * Math.PI) / 180;
-
-  const N   = a / Math.sqrt(1 - e2 * Math.sin(latR) ** 2);
-  const T   = Math.tan(latR) ** 2;
-  const C   = (e2 / (1 - e2)) * Math.cos(latR) ** 2;
-  const A   = Math.cos(latR) * (lonR - lon0R);
-  const e4  = e2 * e2;
-  const e6  = e4 * e2;
-
-  const M = a * (
-    (1 - e2/4 - 3*e4/64 - 5*e6/256) * latR
-    - (3*e2/8 + 3*e4/32 + 45*e6/1024) * Math.sin(2*latR)
-    + (15*e4/256 + 45*e6/1024) * Math.sin(4*latR)
-    - (35*e6/3072) * Math.sin(6*latR)
-  );
-
-  const easting  = k0 * N * (A + (1-T+C)*A**3/6 + (5-18*T+T**2+72*C-58*(e2/(1-e2)))*A**5/120) + 500000;
-  let   northing = k0 * (M + N * Math.tan(latR) * (A**2/2 + (5-T+9*C+4*C**2)*A**4/24 + (61-58*T+T**2+600*C-330*(e2/(1-e2)))*A**6/720));
-
-  if (lat < 0) northing += 10000000; // hemisferio sur
-
+  const a=6378137.0, f=1/298.257223563, b=a*(1-f), e2=1-(b*b)/(a*a), k0=0.9996;
+  const latR=(lat*Math.PI)/180, lonR=(lon*Math.PI)/180, lon0R=(-69*Math.PI)/180;
+  const N=a/Math.sqrt(1-e2*Math.sin(latR)**2), T=Math.tan(latR)**2;
+  const C=(e2/(1-e2))*Math.cos(latR)**2, A=Math.cos(latR)*(lonR-lon0R);
+  const e4=e2*e2, e6=e4*e2;
+  const M=a*((1-e2/4-3*e4/64-5*e6/256)*latR-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*latR)+(15*e4/256+45*e6/1024)*Math.sin(4*latR)-(35*e6/3072)*Math.sin(6*latR));
+  const easting=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T**2+72*C-58*(e2/(1-e2)))*A**5/120)+500000;
+  let northing=k0*(M+N*Math.tan(latR)*(A**2/2+(5-T+9*C+4*C**2)*A**4/24+(61-58*T+T**2+600*C-330*(e2/(1-e2)))*A**6/720));
+  if (lat<0) northing+=10000000;
   return { easting, northing };
 }
 
 /* ══════════════════════════════════════════════════════════
-   EXPORTACIÓN JSON
+   CONSTRUCCIÓN CSV
    ══════════════════════════════════════════════════════════ */
-function exportJSON(record) {
-  // Excluimos los dataUrl de fotos del JSON (van separados)
-  const exportData = JSON.parse(JSON.stringify(record));
-  exportData.fotos = (record.fotos || []).map((f, i) => ({
-    numero:    i + 1,
-    filename:  CameraModule.getFilenameForDrive(i),
-    caption:   f.caption || '',
-    timestamp: f.timestamp,
-    sizeKB:    f.sizeKB,
-  }));
-
-  const blob     = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url      = URL.createObjectURL(blob);
-  const a        = document.createElement('a');
-  a.href         = url;
-  a.download     = `CNR_${record.codigo_proyecto || record._id.split('-')[0]}_ficha.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('JSON exportado', 'success');
-}
-
-/* ══════════════════════════════════════════════════════════
-   EXPORTACIÓN CSV — compatible Access 2019/365 (UTF-8 BOM)
-   ══════════════════════════════════════════════════════════ */
-function exportCSV(record) {
-  const headers = [
+function csvHeaders() {
+  return [
+    'Tipo Ficha',
     'Código Proyecto','N° Concurso','Fecha Recepción Técnica',
     'Beneficiario','Predio','Rol(es) de Avalúo',
     'Comuna','Provincia','Región',
-    'UTM Este','UTM Norte','UTM Datum','UTM Huso','Uso',
+    'UTM Este','UTM Norte','UTM Datum','UTM Huso',
     'Fecha de Pago','N° Bono','Fecha de Visita',
     'Cultivo Inicial','Cultivo Actual',
     'Antecedentes','Observaciones Técnicas',
     'Tiempo Funcionamiento Obra (años)',
     'Observaciones Generales','Cumple con el Objetivo',
-    'N° Foto 1','Pie de Foto 1',
-    'N° Foto 2','Pie de Foto 2',
-    'N° Foto 3','Pie de Foto 3',
-    'N° Foto 4','Pie de Foto 4',
-    'N° Foto 5','Pie de Foto 5',
-    'ID Registro','Fecha Creación','Fecha Modificación','Sincronizado',
+    'Ruta Foto 1','Pie de Foto 1',
+    'Ruta Foto 2','Pie de Foto 2',
+    'Ruta Foto 3','Pie de Foto 3',
+    'Ruta Foto 4','Pie de Foto 4',
+    'Ruta Foto 5','Pie de Foto 5',
+    'ID Registro','Fecha Creación','Fecha Modificación',
+    'Veces Modificado','Sincronizado',
   ];
+}
 
-  const fotos = record.fotos || [];
-  const fotoColumns = [];
+function recordToRow(r) {
+  const codigo = r.codigo_proyecto || r._id.split('-')[0];
+  const fCols  = [];
   for (let i = 0; i < 5; i++) {
-    const foto = fotos[i];
-    fotoColumns.push(foto ? CameraModule.getFilenameForDrive(i) : '');
-    fotoColumns.push(foto ? (foto.caption || '') : '');
+    const f = (r.fotos || [])[i];
+    fCols.push(f ? `Fotos\\${codigo}\\${CameraModule.getFilenameForDrive(i)}` : '');
+    fCols.push(f ? (f.caption || '') : '');
   }
-
-  const row = [
-    record.codigo_proyecto,
-    record.nro_concurso,
-    record.fecha_recepcion,
-    record.beneficiario,
-    record.predio,
-    record.roles_avaluo,
-    record.comuna,
-    record.provincia,
-    record.region,
-    record.utm_este,
-    record.utm_norte,
-    record.utm_datum,
-    record.utm_huso,
-    record.uso,
-    record.fecha_pago,
-    record.nro_bono,
-    record.fecha_visita,
-    record.cultivo_inicial,
-    record.cultivo_actual,
-    (record.antecedentes || []).map((a, i) => `${i+1}) ${a}`).join(' | '),
-    record.observaciones_tecnicas,
-    record.tiempo_funcionamiento,
-    (record.observaciones_generales || []).map((o, i) => `${i+1}) ${o}`).join(' | '),
-    record.cumple_objetivo,
-    ...fotoColumns,
-    record._id,
-    record._created,
-    record._modified,
-    record._synced ? 'SÍ' : 'NO',
+  return [
+    r.tipo_ficha || CONFIG.TIPO_FICHA,
+    r.codigo_proyecto, r.nro_concurso, r.fecha_recepcion,
+    r.beneficiario, r.predio, r.roles_avaluo,
+    r.comuna, r.provincia, r.region,
+    r.utm_este, r.utm_norte, r.utm_datum, r.utm_huso,
+    r.fecha_pago, r.nro_bono, r.fecha_visita,
+    r.cultivo_inicial, r.cultivo_actual,
+    (r.antecedentes||[]).map((a,i)=>`${i+1}) ${a}`).join(' | '),
+    r.observaciones_tecnicas,
+    r.tiempo_funcionamiento,
+    (r.observaciones_generales||[]).map((o,i)=>`${i+1}) ${o}`).join(' | '),
+    r.cumple_objetivo,
+    ...fCols,
+    r._id, r._created, r._modified,
+    r._modified_count || 0,
+    r._synced ? 'SÍ' : 'NO',
   ];
+}
 
-  const csvRow  = row.map(csvEscape).join(',');
-  const csv     = [headers.map(csvEscape).join(','), csvRow].join('\r\n');
-  const BOM     = '\uFEFF'; // UTF-8 BOM para Access
-  const blob    = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-  const url     = URL.createObjectURL(blob);
-  const a       = document.createElement('a');
-  a.href        = url;
-  a.download    = `CNR_${record.codigo_proyecto || record._id.split('-')[0]}_ficha.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('CSV exportado', 'success');
+function buildCSV(records) {
+  const rows = [csvHeaders(), ...records.map(recordToRow)].map(r => r.map(csvEscape).join(','));
+  return '\uFEFF' + rows.join('\r\n');
 }
 
 function csvEscape(val) {
-  const str = val === null || val === undefined ? '' : String(val);
-  // Envuelve en comillas si contiene coma, comilla doble o salto de línea
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
+  const s = val == null ? '' : String(val);
+  return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r'))
+    ? `"${s.replace(/"/g,'""')}"` : s;
 }
 
 /* ══════════════════════════════════════════════════════════
-   GOOGLE DRIVE — OAuth2 + Upload
+   EXPORTACIÓN
+   ══════════════════════════════════════════════════════════ */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'), { href: url, download: filename }).click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV(record) {
+  collectFormValues();
+  downloadBlob(
+    new Blob([buildCSV([record])], { type: 'text/csv;charset=utf-8;' }),
+    `CNR_${record.codigo_proyecto || record._id.split('-')[0]}_seguimiento.csv`
+  );
+  showToast('CSV exportado ✓', 'success');
+}
+
+function exportAllCSV() {
+  if (!State.records.length) { showToast('No hay registros para exportar', 'error'); return; }
+  downloadBlob(
+    new Blob([buildCSV(State.records)], { type: 'text/csv;charset=utf-8;' }),
+    `CNR_Seguimiento_Todos_${dateToISO(new Date())}.csv`
+  );
+  showToast(`${State.records.length} registros exportados ✓`, 'success');
+}
+
+function exportJSON(record) {
+  collectFormValues();
+  const data  = JSON.parse(JSON.stringify(record));
+  const codigo = record.codigo_proyecto || record._id.split('-')[0];
+  data.fotos  = (record.fotos||[]).map((f,i) => ({
+    numero: i+1,
+    filename: CameraModule.getFilenameForDrive(i),
+    ruta_access: `Fotos\\${codigo}\\${CameraModule.getFilenameForDrive(i)}`,
+    caption: f.caption||'', timestamp: f.timestamp, sizeKB: f.sizeKB,
+  }));
+  downloadBlob(
+    new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+    `CNR_${codigo}_seguimiento.json`
+  );
+  showToast('JSON exportado ✓', 'success');
+}
+
+/* ══════════════════════════════════════════════════════════
+   GOOGLE DRIVE
    ══════════════════════════════════════════════════════════ */
 function initGoogleAuth() {
-  // Carga el script de Google Identity Services dinámicamente
   if (document.getElementById('gsi-script')) return;
-  const script  = document.createElement('script');
-  script.id     = 'gsi-script';
-  script.src    = 'https://accounts.google.com/gsi/client';
-  script.async  = true;
-  script.defer  = true;
-  document.head.appendChild(script);
+  const s = document.createElement('script');
+  s.id='gsi-script'; s.src='https://accounts.google.com/gsi/client';
+  s.async=true; s.defer=true;
+  document.head.appendChild(s);
 }
 
 function requestDriveToken() {
   return new Promise((resolve, reject) => {
-    if (!window.google) {
-      reject(new Error('Google Identity Services no cargado'));
-      return;
-    }
-
-    const tokenClient = google.accounts.oauth2.initTokenClient({
+    if (!window.google) { reject(new Error('Google Identity Services no cargado')); return; }
+    google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.GOOGLE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/drive.file',
-      callback: (response) => {
-        if (response.error) {
-          reject(new Error(response.error));
-        } else {
-          State.driveToken = response.access_token;
-          resolve(response.access_token);
-        }
-      },
-    });
-
-    tokenClient.requestAccessToken({ prompt: '' });
+      callback: (r) => r.error ? reject(new Error(r.error)) : (State.driveToken = r.access_token, resolve(r.access_token)),
+    }).requestAccessToken({ prompt: '' });
   });
 }
 
-async function getOrCreateDriveFolder(token) {
-  // Busca si ya existe la carpeta
-  const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  const searchData = await searchRes.json();
-  if (searchData.files && searchData.files.length > 0) {
-    return searchData.files[0].id;
-  }
-
-  // Crea la carpeta si no existe
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: {
-      Authorization:  `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name:     CONFIG.DRIVE_FOLDER_NAME,
-      mimeType: 'application/vnd.google-apps.folder',
-    }),
-  });
-  const createData = await createRes.json();
-  return createData.id;
+async function driveGetOrCreateFolder(token, name, parentId = null) {
+  const q   = `name='${name}' and mimeType='application/vnd.google-apps.folder'${parentId?` and '${parentId}' in parents`:''} and trashed=false`;
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+    { headers: { Authorization: `Bearer ${token}` } });
+  const d   = await res.json();
+  if (d.files?.length) return d.files[0].id;
+  const body = { name, mimeType: 'application/vnd.google-apps.folder', ...(parentId && { parents:[parentId] }) };
+  const cr   = await fetch('https://www.googleapis.com/drive/v3/files',
+    { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  return (await cr.json()).id;
 }
 
-async function getOrCreateProjectFolder(token, parentId, codigoProyecto) {
-  const folderName = codigoProyecto || 'sin_codigo';
-  const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id,name)`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  const searchData = await searchRes.json();
-  if (searchData.files && searchData.files.length > 0) {
-    return searchData.files[0].id;
-  }
-
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: {
-      Authorization:  `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name:     folderName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents:  [parentId],
-    }),
-  });
-  const createData = await createRes.json();
-  return createData.id;
+async function driveUploadFile(token, folderId, filename, blob, mimeType) {
+  const q   = `name='${filename}' and '${folderId}' in parents and trashed=false`;
+  const sr  = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+    { headers:{ Authorization:`Bearer ${token}` } });
+  const sd  = await sr.json();
+  const eid = sd.files?.[0]?.id;
+  const meta = JSON.stringify({ name:filename, ...(!eid && { parents:[folderId] }) });
+  const form = new FormData();
+  form.append('metadata', new Blob([meta], { type:'application/json' }));
+  form.append('file', blob);
+  const url = eid
+    ? `https://www.googleapis.com/upload/drive/v3/files/${eid}?uploadType=multipart`
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  return fetch(url, { method: eid?'PATCH':'POST', headers:{ Authorization:`Bearer ${token}` }, body:form });
 }
 
-async function uploadFileToDrive(token, folderId, filename, blob, mimeType) {
-  const metadata = JSON.stringify({ name: filename, parents: [folderId] });
-  const formData = new FormData();
-  formData.append('metadata', new Blob([metadata], { type: 'application/json' }));
-  formData.append('file', blob);
-
-  const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
-    {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body:    formData,
-    }
-  );
-  return res.json();
-}
-
-/* ── Sincronización completa de un registro ─────────────── */
 async function syncRecord(record, token) {
-  const rootFolderId    = await getOrCreateDriveFolder(token);
-  const projectFolderId = await getOrCreateProjectFolder(token, rootFolderId, record.codigo_proyecto);
+  const rootId    = await driveGetOrCreateFolder(token, CONFIG.DRIVE_FOLDER_NAME);
+  const projectId = await driveGetOrCreateFolder(token, record.codigo_proyecto||'sin_codigo', rootId);
+  const codigo    = record.codigo_proyecto || record._id.split('-')[0];
 
-  // 1. Subir CSV
-  const BOM    = '\uFEFF';
-  const csvStr = generateCSVString(record);
-  const csvBlob = new Blob([BOM + csvStr], { type: 'text/csv;charset=utf-8;' });
-  await uploadFileToDrive(
-    token,
-    projectFolderId,
-    `${record.codigo_proyecto || record._id.split('-')[0]}_ficha.csv`,
-    csvBlob,
-    'text/csv'
-  );
+  await driveUploadFile(token, projectId, `${codigo}_seguimiento.csv`,
+    new Blob([buildCSV([record])], { type:'text/csv;charset=utf-8;' }), 'text/csv');
 
-  // 2. Subir JSON
-  const exportData     = prepareJSONExport(record);
-  const jsonBlob       = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  await uploadFileToDrive(
-    token,
-    projectFolderId,
-    `${record.codigo_proyecto || record._id.split('-')[0]}_ficha.json`,
-    jsonBlob,
-    'application/json'
-  );
-
-  // 3. Subir fotos
-  for (let i = 0; i < (record.fotos || []).length; i++) {
-    const foto     = record.fotos[i];
-    const filename = CameraModule.getFilenameForDrive(i);
-    const blob     = CameraModule.dataUrlToBlob(foto.dataUrl);
-    await uploadFileToDrive(token, projectFolderId, filename, blob, 'image/jpeg');
-  }
-
-  return projectFolderId;
-}
-
-function generateCSVString(record) {
-  const headers = [
-    'Código Proyecto','N° Concurso','Fecha Recepción Técnica',
-    'Beneficiario','Predio','Rol(es) de Avalúo',
-    'Comuna','Provincia','Región',
-    'UTM Este','UTM Norte','UTM Datum','UTM Huso','Uso',
-    'Fecha de Pago','N° Bono','Fecha de Visita',
-    'Cultivo Inicial','Cultivo Actual',
-    'Antecedentes','Observaciones Técnicas',
-    'Tiempo Funcionamiento Obra (años)',
-    'Observaciones Generales','Cumple con el Objetivo',
-    'N° Foto 1','Pie de Foto 1','N° Foto 2','Pie de Foto 2',
-    'N° Foto 3','Pie de Foto 3','N° Foto 4','Pie de Foto 4',
-    'N° Foto 5','Pie de Foto 5',
-    'ID Registro','Fecha Creación','Fecha Modificación','Sincronizado',
-  ];
-
-  const fotos = record.fotos || [];
-  const fotoColumns = [];
-  for (let i = 0; i < 5; i++) {
-    const foto = fotos[i];
-    fotoColumns.push(foto ? CameraModule.getFilenameForDrive(i) : '');
-    fotoColumns.push(foto ? (foto.caption || '') : '');
-  }
-
-  const row = [
-    record.codigo_proyecto, record.nro_concurso, record.fecha_recepcion,
-    record.beneficiario, record.predio, record.roles_avaluo,
-    record.comuna, record.provincia, record.region,
-    record.utm_este, record.utm_norte, record.utm_datum, record.utm_huso, record.uso,
-    record.fecha_pago, record.nro_bono, record.fecha_visita,
-    record.cultivo_inicial, record.cultivo_actual,
-    (record.antecedentes || []).map((a, i) => `${i+1}) ${a}`).join(' | '),
-    record.observaciones_tecnicas,
-    record.tiempo_funcionamiento,
-    (record.observaciones_generales || []).map((o, i) => `${i+1}) ${o}`).join(' | '),
-    record.cumple_objetivo,
-    ...fotoColumns,
-    record._id, record._created, record._modified, 'SÍ',
-  ];
-
-  return [headers.map(csvEscape).join(','), row.map(csvEscape).join(',')].join('\r\n');
-}
-
-function prepareJSONExport(record) {
-  const data  = JSON.parse(JSON.stringify(record));
-  data.fotos  = (record.fotos || []).map((f, i) => ({
-    numero:    i + 1,
-    filename:  CameraModule.getFilenameForDrive(i),
-    caption:   f.caption || '',
-    timestamp: f.timestamp,
-    sizeKB:    f.sizeKB,
+  const jdata = JSON.parse(JSON.stringify(record));
+  jdata.fotos = (record.fotos||[]).map((f,i)=>({
+    numero:i+1, filename:CameraModule.getFilenameForDrive(i),
+    ruta_access:`Fotos\\${codigo}\\${CameraModule.getFilenameForDrive(i)}`,
+    caption:f.caption||'', timestamp:f.timestamp, sizeKB:f.sizeKB,
   }));
-  return data;
+  await driveUploadFile(token, projectId, `${codigo}_seguimiento.json`,
+    new Blob([JSON.stringify(jdata,null,2)], { type:'application/json' }), 'application/json');
+
+  for (let i=0; i<(record.fotos||[]).length; i++) {
+    await driveUploadFile(token, projectId, CameraModule.getFilenameForDrive(i),
+      CameraModule.dataUrlToBlob(record.fotos[i].dataUrl), 'image/jpeg');
+  }
 }
 
-/* ── Trigger de sincronización ──────────────────────────── */
 async function triggerSync() {
   if (State.isSyncing || !State.isOnline) return;
   const unsynced = State.records.filter(r => !r._synced);
-  if (unsynced.length === 0) return;
-
+  if (!unsynced.length) return;
   State.isSyncing = true;
   updateSyncUI('syncing');
-
   try {
-    let token = State.driveToken;
-    if (!token) {
-      token = await requestDriveToken();
-    }
-
+    const token = State.driveToken || await requestDriveToken();
     for (const record of unsynced) {
       await syncRecord(record, token);
-      record._synced   = true;
-      record._syncedAt = new Date().toISOString();
+      record._synced = true; record._syncedAt = new Date().toISOString();
       await dbPut(record);
     }
-
     State.records = await dbGetAll();
     renderRecordsList();
-    showToast(`${unsynced.length} registro(s) sincronizado(s) a Drive`, 'success');
+    showToast(`${unsynced.length} registro(s) sincronizado(s) ✓`, 'success');
     updateSyncUI('online');
-
   } catch (err) {
-    console.error('Error de sincronización:', err);
+    console.error('Sync error:', err);
     showToast('Error al sincronizar. Intente manualmente.', 'error');
     updateSyncUI('online');
-
-    // Token expirado → limpiar para forzar nuevo login
-    if (err.message && err.message.includes('401')) {
-      State.driveToken = null;
-    }
+    if (err.message?.includes('401')) State.driveToken = null;
   } finally {
     State.isSyncing = false;
   }
 }
 
 /* ══════════════════════════════════════════════════════════
-   RENDERIZADO UI
+   UI
    ══════════════════════════════════════════════════════════ */
 function renderRecordsList() {
-  const container  = document.getElementById('records-list');
-  const searchVal  = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const container = document.getElementById('records-list');
+  const searchVal = (document.getElementById('search-input')?.value||'').toLowerCase();
+  let filtered    = State.records.filter(r =>
+    !searchVal ||
+    (r.beneficiario||'').toLowerCase().includes(searchVal) ||
+    (r.codigo_proyecto||'').toLowerCase().includes(searchVal) ||
+    (r.nro_bono||'').toLowerCase().includes(searchVal)
+  ).sort((a,b) => new Date(b._modified)-new Date(a._modified));
 
-  let filtered = State.records;
-  if (searchVal) {
-    filtered = State.records.filter(r =>
-      (r.beneficiario || '').toLowerCase().includes(searchVal) ||
-      (r.codigo_proyecto || '').toLowerCase().includes(searchVal) ||
-      (r.nro_bono || '').toLowerCase().includes(searchVal)
-    );
-  }
-
-  // Más recientes primero
-  filtered.sort((a, b) => new Date(b._modified) - new Date(a._modified));
-
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📋</div>
-        <h3>${searchVal ? 'Sin resultados' : 'Sin registros'}</h3>
-        <p>${searchVal ? 'Pruebe con otro término' : 'Cree un nuevo registro con el botón "+"'}</p>
-      </div>`;
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div>
+      <h3>${searchVal?'Sin resultados':'Sin registros'}</h3>
+      <p>${searchVal?'Pruebe otro término':'Cree un registro con "Nueva Ficha"'}</p></div>`;
     return;
   }
-
   container.innerHTML = '';
   filtered.forEach(record => {
+    const isModified = (record._modified_count||0) > 1;
     const card = document.createElement('div');
-    card.className = 'record-card' + (State.currentRecord?._id === record._id ? ' active' : '');
+    card.className = 'record-card' + (State.currentRecord?._id===record._id?' active':'');
     card.innerHTML = `
-      <div class="record-card-code">${escapeHtml(record.codigo_proyecto || 'Sin código')}</div>
-      <div class="record-card-name">${escapeHtml(record.beneficiario || 'Sin beneficiario')}</div>
-      <div class="record-card-meta">
-        <span>${escapeHtml(record.fecha_visita || '')}</span>
-        <span class="badge ${record._synced ? 'badge-synced' : 'badge-pending'}">
-          ${record._synced ? '✓ Sync' : '⏳ Local'}
-        </span>
-        ${record.cumple_objetivo ? `<span class="badge badge-${record.cumple_objetivo.toLowerCase()}">${record.cumple_objetivo}</span>` : ''}
+      <div class="record-card-code">
+        ${escapeHtml(record.codigo_proyecto||'Sin código')}
+        ${isModified?`<span class="mod-star" title="Modificado ${record._modified_count-1} vez/veces">✱</span>`:''}
       </div>
+      <div class="record-card-name">${escapeHtml(record.beneficiario||'Sin beneficiario')}</div>
+      <div class="record-card-meta">
+        <span>${isoToDisplay(record.fecha_visita||'')}</span>
+        <span class="badge ${record._synced?'badge-synced':'badge-pending'}">${record._synced?'✓ Sync':'⏳ Local'}</span>
+        ${record.cumple_objetivo?`<span class="badge badge-${record.cumple_objetivo.toLowerCase()}">${record.cumple_objetivo}</span>`:''}
+      </div>
+      ${isModified?`<div class="record-card-moddate">Últ. modificación: ${formatDateShort(record._modified)}</div>`:''}
     `;
-    card.addEventListener('click', () => {
-      loadRecordToForm(record);
-      renderRecordsList(); // actualiza clase active
-    });
+    card.addEventListener('click', () => { loadRecordToForm(record); renderRecordsList(); });
     container.appendChild(card);
   });
 }
 
 function updateSyncUI(state) {
-  const dot  = document.getElementById('status-dot');
-  const text = document.getElementById('status-text');
-  const btn  = document.getElementById('sync-btn');
-
-  const states = {
-    online:  { dot: 'online',  text: 'En línea', btn: 'Sincronizar' },
-    offline: { dot: 'offline', text: 'Sin conexión', btn: 'Sin conexión' },
-    syncing: { dot: 'syncing', text: 'Sincronizando…', btn: 'Sincronizando…' },
-  };
-
-  const s = states[state] || states.offline;
-  if (dot)  { dot.className = `status-dot ${s.dot}`; }
-  if (text) { text.textContent = s.text; }
-  if (btn)  {
-    btn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        class="${state === 'syncing' ? 'spin-anim' : ''}">
-        <path d="M23 4v6h-6M1 20v-6h6"/>
-        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-      </svg>
-      ${s.btn}`;
-    btn.disabled = state === 'syncing' || state === 'offline';
+  const cfg = { online:{dot:'online',text:'En línea',btn:'Sincronizar'},
+                offline:{dot:'offline',text:'Sin conexión',btn:'Sin conexión'},
+                syncing:{dot:'syncing',text:'Sincronizando…',btn:'Sincronizando…'} }[state];
+  if (!cfg) return;
+  const dot=document.getElementById('status-dot'), text=document.getElementById('status-text'), btn=document.getElementById('sync-btn');
+  if (dot)  dot.className    = `status-dot ${cfg.dot}`;
+  if (text) text.textContent = cfg.text;
+  if (btn) {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      style="${state==='syncing'?'animation:spin 1s linear infinite':''}">
+      <path d="M23 4v6h-6M1 20v-6h6"/>
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+    </svg>${cfg.btn}`;
+    btn.disabled = state==='syncing'||state==='offline';
   }
 }
 
 function updateCumpleVisual(value) {
-  document.querySelectorAll('.cumple-option').forEach(opt => opt.classList.remove('selected'));
-  if (value) {
-    const selected = document.querySelector(`.cumple-option.${value.toLowerCase()}-opt`);
-    if (selected) selected.classList.add('selected');
-  }
+  document.querySelectorAll('.cumple-option').forEach(o=>o.classList.remove('selected'));
+  if (value) document.querySelector(`.cumple-option.${value.toLowerCase()}-opt`)?.classList.add('selected');
 }
 
-/* ══════════════════════════════════════════════════════════
-   TOAST
-   ══════════════════════════════════════════════════════════ */
-function showToast(msg, type = 'info') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const icons = { success: '✓', error: '✕', info: 'ℹ' };
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = `${icons[type] || ''} ${msg}`;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3500);
+function showToast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = `${{success:'✓',error:'✕',info:'ℹ'}[type]||''} ${msg}`;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(), 3500);
 }
 
-/* ══════════════════════════════════════════════════════════
-   UTILIDADES
-   ══════════════════════════════════════════════════════════ */
 function escapeHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function formatDate(isoString) {
-  if (!isoString) return '';
-  return new Date(isoString).toLocaleDateString('es-CL');
+function formatDateShort(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch { return iso; }
 }
 
 /* ══════════════════════════════════════════════════════════
    INICIALIZACIÓN
    ══════════════════════════════════════════════════════════ */
 async function init() {
-  // Abrir DB
   State.db      = await openDB();
   State.records = await dbGetAll();
-
-  // Inicializar módulo de cámara
   CameraModule.init(addPhoto);
-
-  // Google Identity Services
   initGoogleAuth();
-
-  // Escuchar eventos de cámara
   window.addEventListener('cnr:toast', (e) => showToast(e.detail.msg, e.detail.type));
-
-  // Conectividad
-  window.addEventListener('online',  () => {
-    State.isOnline = true;
-    updateSyncUI('online');
-    triggerSync();
-  });
-  window.addEventListener('offline', () => {
-    State.isOnline = false;
-    updateSyncUI('offline');
-  });
+  window.addEventListener('online',  () => { State.isOnline=true;  updateSyncUI('online');  triggerSync(); });
+  window.addEventListener('offline', () => { State.isOnline=false; updateSyncUI('offline'); });
   updateSyncUI(State.isOnline ? 'online' : 'offline');
-
-  // PWA install prompt
   window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    State.installPrompt = e;
-    const banner = document.getElementById('install-banner');
-    if (banner) banner.classList.add('visible');
+    e.preventDefault(); State.installPrompt=e;
+    document.getElementById('install-banner')?.classList.add('visible');
   });
-
-  // Renderizar lista inicial
   renderRecordsList();
-
-  // Eventos del formulario
   bindFormEvents();
 }
 
 function bindFormEvents() {
-  // Nuevo registro
   document.getElementById('new-record-btn')?.addEventListener('click', () => {
     State.currentRecord = createEmptyRecord();
     State.records.push(State.currentRecord);
     loadRecordToForm(State.currentRecord);
     renderRecordsList();
   });
-
-  // Guardar
   document.getElementById('save-btn')?.addEventListener('click', saveCurrentRecord);
-
-  // Exportar JSON
-  document.getElementById('export-json-btn')?.addEventListener('click', () => {
-    if (State.currentRecord) {
-      collectFormValues();
-      exportJSON(State.currentRecord);
-    }
-  });
-
-  // Exportar CSV
-  document.getElementById('export-csv-btn')?.addEventListener('click', () => {
-    if (State.currentRecord) {
-      collectFormValues();
-      exportCSV(State.currentRecord);
-    }
-  });
-
-  // Sync manual
+  document.getElementById('export-csv-btn')?.addEventListener('click', () => { if (State.currentRecord) exportCSV(State.currentRecord); });
+  document.getElementById('export-all-csv-btn')?.addEventListener('click', exportAllCSV);
+  document.getElementById('export-json-btn')?.addEventListener('click', () => { if (State.currentRecord) exportJSON(State.currentRecord); });
   document.getElementById('sync-btn')?.addEventListener('click', triggerSync);
-
-  // Búsqueda
   document.getElementById('search-input')?.addEventListener('input', renderRecordsList);
-
-  // GPS
   document.getElementById('gps-btn')?.addEventListener('click', getGeoLocation);
-
-  // Cámara
   document.getElementById('camera-btn')?.addEventListener('click', () => {
-    if (!State.currentRecord) { showToast('Primero guarde o cree un registro', 'error'); return; }
-    CameraModule.captureFromCamera((State.currentRecord.fotos || []).length);
+    if (!State.currentRecord) { showToast('Primero cree o guarde un registro','error'); return; }
+    CameraModule.captureFromCamera((State.currentRecord.fotos||[]).length);
   });
-
-  // Galería
   document.getElementById('gallery-btn')?.addEventListener('click', () => {
-    if (!State.currentRecord) { showToast('Primero guarde o cree un registro', 'error'); return; }
-    CameraModule.selectFromGallery((State.currentRecord.fotos || []).length);
+    if (!State.currentRecord) { showToast('Primero cree o guarde un registro','error'); return; }
+    CameraModule.selectFromGallery((State.currentRecord.fotos||[]).length);
   });
-
-  // Cumple objetivo
   document.querySelectorAll('.cumple-option').forEach(opt => {
     opt.addEventListener('click', () => {
       const input = opt.querySelector('input[type="radio"]');
-      if (input) {
-        input.checked = true;
-        updateCumpleVisual(input.value);
-      }
+      if (input) { input.checked=true; updateCumpleVisual(input.value); }
     });
   });
-
-  // Listas dinámicas — botones agregar ítem
-  document.getElementById('add-antecedente')?.addEventListener('click', () => {
-    const container = document.getElementById('antecedentes-list');
-    addDynamicItem(container);
-  });
-
-  document.getElementById('add-obs-general')?.addEventListener('click', () => {
-    const container = document.getElementById('obs-generales-list');
-    addDynamicItem(container);
-  });
-
-  // Install PWA
+  document.getElementById('add-antecedente')?.addEventListener('click', () =>
+    addDynamicItem(document.getElementById('antecedentes-list')));
+  document.getElementById('add-obs-general')?.addEventListener('click', () =>
+    addDynamicItem(document.getElementById('obs-generales-list')));
   document.getElementById('install-btn')?.addEventListener('click', async () => {
     if (State.installPrompt) {
       State.installPrompt.prompt();
-      const result = await State.installPrompt.userChoice;
-      if (result.outcome === 'accepted') {
-        document.getElementById('install-banner')?.classList.remove('visible');
-      }
+      const r = await State.installPrompt.userChoice;
+      if (r.outcome==='accepted') document.getElementById('install-banner')?.classList.remove('visible');
     }
   });
 }
 
-/* ── Arranque ────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', init);
