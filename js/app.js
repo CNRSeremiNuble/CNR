@@ -141,7 +141,7 @@ function dbPut(record) {
    ══════════════════════════════════════════════════════════ */
 async function saveCurrentRecord() {
   if (!State.currentRecord) return;
-  const isNew = State.currentRecord._modified_count === 0;
+  const isFirstSave = State.currentRecord._modified_count === 0;
   collectFormValues();
   State.currentRecord._modified       = new Date().toISOString();
   State.currentRecord._modified_count = (State.currentRecord._modified_count || 0) + 1;
@@ -149,8 +149,24 @@ async function saveCurrentRecord() {
   await dbPut(State.currentRecord);
   State.records = await dbGetAll();
   renderRecordsList();
-  showToast(isNew ? 'Ficha guardada ✓' : 'Ficha actualizada ✓', 'success');
   if (State.isOnline) triggerSync();
+
+  // Mostrar modal post-guardado solo en primera vez
+  if (isFirstSave) {
+    showPostSaveModal();
+  } else {
+    showToast('Ficha actualizada ✓', 'success');
+  }
+}
+
+function showPostSaveModal() {
+  const modal = document.getElementById('modal-post-save');
+  if (modal) modal.classList.add('open');
+}
+
+function hidePostSaveModal() {
+  const modal = document.getElementById('modal-post-save');
+  if (modal) modal.classList.remove('open');
 }
 
 function collectFormValues() {
@@ -554,25 +570,55 @@ function renderRecordsList() {
       <p>${searchVal?'Pruebe otro término':'Cree un registro con "Nueva Ficha"'}</p></div>`;
     return;
   }
+  // Actualizar contador en botón Mis Fichas
+  const fichasLabel = document.getElementById('mis-fichas-label');
+  if (fichasLabel) {
+    const total = State.records.length;
+    fichasLabel.innerHTML = `Mis Fichas ${total > 0 ? `<span class="count-badge">${total}</span>` : ''}`;
+  }
+
   container.innerHTML = '';
   filtered.forEach(record => {
     const isModified = (record._modified_count||0) > 1;
     const card = document.createElement('div');
     card.className = 'record-card' + (State.currentRecord?._id===record._id?' active':'');
+
     card.innerHTML = `
-      <div class="record-card-code">
-        ${escapeHtml(record.codigo_proyecto||'Sin código')}
-        ${isModified?`<span class="mod-star" title="Modificado ${record._modified_count-1} vez/veces">✱</span>`:''}
+      <div class="record-card-delete-bg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+        </svg>
+        Eliminar
       </div>
-      <div class="record-card-name">${escapeHtml(record.beneficiario||'Sin beneficiario')}</div>
-      <div class="record-card-meta">
-        <span>${isoToDisplay(record.fecha_visita||'')}</span>
-        <span class="badge ${record._synced?'badge-synced':'badge-pending'}">${record._synced?'✓ Sync':'⏳ Local'}</span>
-        ${record.cumple_objetivo?`<span class="badge badge-${record.cumple_objetivo.toLowerCase()}">${record.cumple_objetivo}</span>`:''}
+      <div class="record-card-inner">
+        <div class="record-card-code">
+          ${escapeHtml(record.codigo_proyecto||'Sin código')}
+          ${isModified?`<span class="mod-star" title="Modificado ${record._modified_count-1} vez/veces">✱</span>`:''}
+        </div>
+        <div class="record-card-name">${escapeHtml(record.beneficiario||'Sin beneficiario')}</div>
+        <div class="record-card-meta">
+          <span>${isoToDisplay(record.fecha_visita||'')}</span>
+          <span class="badge ${record._synced?'badge-synced':'badge-pending'}">${record._synced?'✓ Sync':'⏳ Local'}</span>
+          ${record.cumple_objetivo?`<span class="badge badge-${record.cumple_objetivo.toLowerCase()}">${record.cumple_objetivo}</span>`:''}
+        </div>
+        ${isModified?`<div class="record-card-moddate">Últ. modificación: ${formatDateShort(record._modified)}</div>`:''}
       </div>
-      ${isModified?`<div class="record-card-moddate">Últ. modificación: ${formatDateShort(record._modified)}</div>`:''}
     `;
-    card.addEventListener('click', () => { loadRecordToForm(record); renderRecordsList(); });
+
+    // Toque normal → abrir registro
+    card.querySelector('.record-card-inner').addEventListener('click', () => {
+      if (card.classList.contains('swiping-left')) {
+        card.classList.remove('swiping-left');
+        return;
+      }
+      loadRecordToForm(record);
+      renderRecordsList();
+    });
+
+    // Desliz izquierda → mostrar botón eliminar
+    bindSwipeDelete(card, record);
+
     container.appendChild(card);
   });
 }
@@ -640,7 +686,108 @@ async function init() {
   bindFormEvents();
 }
 
+/* ══════════════════════════════════════════════════════════
+   DESLIZ Y PRESS LARGO PARA BORRAR
+   ══════════════════════════════════════════════════════════ */
+function bindSwipeDelete(card, record) {
+  let startX = 0, startY = 0, isDragging = false, longPressTimer = null;
+  const SWIPE_THRESHOLD    = 60;
+  const LONG_PRESS_DELAY   = 600;
+
+  card.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isDragging = false;
+
+    // Press largo
+    longPressTimer = setTimeout(() => {
+      card.classList.add('press-long');
+      showDeleteConfirm(record);
+    }, LONG_PRESS_DELAY);
+  }, { passive: true });
+
+  card.addEventListener('touchmove', (e) => {
+    clearTimeout(longPressTimer);
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      isDragging = true;
+      if (dx < -20) card.classList.add('swiping-left');
+      else if (dx > 20) card.classList.remove('swiping-left');
+    }
+  }, { passive: true });
+
+  card.addEventListener('touchend', (e) => {
+    clearTimeout(longPressTimer);
+    card.classList.remove('press-long');
+    if (!isDragging) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (dx < -SWIPE_THRESHOLD) {
+      card.classList.add('swiping-left');
+      // Toque en zona roja → confirmar borrado
+      card.querySelector('.record-card-delete-bg').addEventListener('click', () => {
+        showDeleteConfirm(record);
+      }, { once: true });
+    } else {
+      card.classList.remove('swiping-left');
+    }
+  }, { passive: true });
+}
+
+let _pendingDeleteRecord = null;
+
+function showDeleteConfirm(record) {
+  _pendingDeleteRecord = record;
+  const modal    = document.getElementById('modal-confirm-delete');
+  const nameEl   = document.getElementById('modal-delete-name');
+  if (nameEl) nameEl.textContent =
+    `${record.codigo_proyecto || 'Sin código'} — ${record.beneficiario || 'Sin beneficiario'}`;
+  if (modal) modal.classList.add('open');
+}
+
 function bindFormEvents() {
+  // Modal post-guardado
+  document.getElementById('modal-nueva-ficha')?.addEventListener('click', () => {
+    hidePostSaveModal();
+    State.currentRecord = createEmptyRecord();
+    State.records.push(State.currentRecord);
+    loadRecordToForm(State.currentRecord);
+    renderRecordsList();
+  });
+  document.getElementById('modal-ver-registros')?.addEventListener('click', () => {
+    hidePostSaveModal();
+    // Abrir sidebar en tablet
+    const sidebar = document.getElementById('records-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (window.innerWidth <= 900) {
+      sidebar?.classList.add('mobile-visible');
+      overlay?.classList.add('visible');
+      document.body.style.overflow = 'hidden';
+    }
+  });
+  document.getElementById('modal-continuar')?.addEventListener('click', hidePostSaveModal);
+
+  // Modal confirmar borrado
+  document.getElementById('modal-delete-cancel')?.addEventListener('click', () => {
+    document.getElementById('modal-confirm-delete')?.classList.remove('open');
+    _pendingDeleteRecord = null;
+    // Cerrar desliz abierto
+    document.querySelectorAll('.record-card.swiping-left').forEach(c => c.classList.remove('swiping-left'));
+  });
+  document.getElementById('modal-delete-confirm')?.addEventListener('click', async () => {
+    document.getElementById('modal-confirm-delete')?.classList.remove('open');
+    if (_pendingDeleteRecord) {
+      await deleteRecord(_pendingDeleteRecord);
+      _pendingDeleteRecord = null;
+    }
+  });
+
+  // Botón eliminar en action bar
+  document.getElementById('delete-btn')?.addEventListener('click', () => {
+    if (!State.currentRecord) return;
+    showDeleteConfirm(State.currentRecord);
+  });
+
   document.getElementById('new-record-btn')?.addEventListener('click', () => {
     State.currentRecord = createEmptyRecord();
     State.records.push(State.currentRecord);
@@ -680,5 +827,52 @@ function bindFormEvents() {
     }
   });
 }
+
+/* ══════════════════════════════════════════════════════════
+   ELIMINAR REGISTRO
+   ══════════════════════════════════════════════════════════ */
+function dbDelete(id) {
+  return new Promise((resolve, reject) => {
+    const tx  = State.db.transaction(CONFIG.STORE_NAME, 'readwrite');
+    const req = tx.objectStore(CONFIG.STORE_NAME).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror   = (e) => reject(e.target.error);
+  });
+}
+
+async function deleteRecord(record) {
+  await dbDelete(record._id);
+  State.records = State.records.filter(r => r._id !== record._id);
+
+  if (record._synced && State.isOnline) {
+    try {
+      const token = State.driveToken || await requestDriveToken();
+      await markDeletedInDrive(token, record);
+    } catch (err) {
+      console.warn('No se pudo marcar en Drive:', err);
+    }
+  }
+
+  if (State.currentRecord && State.currentRecord._id === record._id) {
+    State.currentRecord = null;
+    document.getElementById('no-record-msg').style.display = 'flex';
+    document.getElementById('form-wrapper').style.display  = 'none';
+    document.getElementById('action-bar').style.display    = 'none';
+  }
+
+  renderRecordsList();
+  showToast('Ficha eliminada', 'success');
+}
+
+async function markDeletedInDrive(token, record) {
+  const codigo    = record.codigo_proyecto || record._id.split('-')[0];
+  const rootId    = await driveGetOrCreateFolder(token, CONFIG.DRIVE_FOLDER_NAME);
+  const projectId = await driveGetOrCreateFolder(token, codigo, rootId);
+  const csv       = buildCSV([Object.assign({}, record, { _deleted: true, _deletedAt: new Date().toISOString() })]);
+  await driveUploadFile(token, projectId,
+    'ELIMINADO_' + codigo + '_seguimiento.csv',
+    new Blob([csv], { type: 'text/csv;charset=utf-8;' }), 'text/csv');
+}
+
 
 document.addEventListener('DOMContentLoaded', init);
