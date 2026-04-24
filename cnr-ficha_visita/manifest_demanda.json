@@ -1,0 +1,40 @@
+{
+  "name": "CNR Visita Terreno — Ficha Digital Demanda de Riego",
+  "short_name": "CNR Visita",
+  "description": "Ficha digital de visita a terreno CNR para validación de datos de demanda de riego — Ñuble",
+  "start_url": "/cnr-ficha_visita/index.html",
+  "scope": "/cnr-ficha_visita/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0057A8",
+  "theme_color": "#0057A8",
+  "lang": "es-CL",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/cnr-seguimiento/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/cnr-seguimiento/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/cnr-seguimiento/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/cnr-seguimiento/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "prefer_related_applications": false
+}

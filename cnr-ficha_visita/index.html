@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0057A8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CNR Visita Terreno">
+  <meta name="description" content="Ficha de visita a terreno CNR — Validación de datos para demanda de riego">
+
+  <title>CNR Ficha Visita Terreno</title>
+
+  <link rel="manifest" href="manifest_demanda.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="../cnr-seguimiento/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="../cnr-seguimiento/icons/icon-192.png">
+  <link rel="stylesheet" href="styles_demanda.css">
+</head>
+<body>
+
+<!-- ── Banner instalación PWA ─────────────────────────── -->
+<div id="install-banner" class="install-banner">
+  <span>📱 Instale la app para usarla sin conexión en su tablet</span>
+  <button id="install-btn">Instalar</button>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────── -->
+<header class="app-header">
+  <button id="hamburger-btn" class="mis-fichas-btn" title="Ver mis fichas" aria-label="Abrir lista de registros">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="8" y1="13" x2="16" y2="13"/>
+      <line x1="8" y1="17" x2="16" y2="17"/>
+    </svg>
+    <span id="mis-fichas-label">Mis Fichas</span>
+  </button>
+  <div>
+    <div class="logo-text">CNR Visita Terreno</div>
+    <div class="logo-sub">Ficha Digital · Demanda de Riego</div>
+  </div>
+  <div class="header-spacer"></div>
+  <button id="sync-btn" class="sync-btn" title="Sincronizar con Google Drive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M23 4v6h-6M1 20v-6h6"/>
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+    </svg>
+    Sincronizar
+  </button>
+</header>
+
+<!-- ── Status bar ─────────────────────────────────────── -->
+<div class="status-bar">
+  <span id="status-dot" class="status-dot"></span>
+  <span id="status-text">Verificando conexión…</span>
+  <span style="margin-left:auto;opacity:.6;font-size:.7rem;">
+    CNR · Comisión Nacional de Riego · Chile
+  </span>
+</div>
+
+<!-- ── Overlay oscuro para sidebar móvil ─────────────── -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<!-- ── Layout principal ───────────────────────────────── -->
+<div class="main-layout">
+
+  <!-- Sidebar lista de registros -->
+  <aside class="records-sidebar" id="records-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">📋 Registros</div>
+      <button class="new-record-btn" id="new-record-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nueva Ficha
+      </button>
+      <input
+        type="search"
+        id="search-input"
+        class="search-input"
+        placeholder="Buscar por nombre, RUT…"
+        autocomplete="off"
+      >
+    </div>
+    <div class="records-list" id="records-list">
+      <!-- Registros generados por JS -->
+    </div>
+  </aside>
+
+  <!-- Área del formulario -->
+  <div class="form-area" id="form-area">
+
+    <!-- Estado: sin registro seleccionado -->
+    <div id="no-record-msg" class="no-record-selected">
+      <div class="big-icon">🌾</div>
+      <h2>Seleccione o cree una ficha</h2>
+      <p>Use el panel izquierdo para abrir un registro existente o cree uno nuevo con el botón <strong>"Nueva Ficha"</strong>.</p>
+    </div>
+
+    <!-- Wrapper del formulario -->
+    <div id="form-wrapper" style="display:none; flex-direction:column; gap:24px; flex:1;">
+
+      <!-- ════════════════════════════════════════════════
+           ENCABEZADO — FECHA VISITA E ID
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📅</span>
+          <h2>Ficha Visita Terreno</h2>
+          <span id="record-id-display" class="record-id-display"></span>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group">
+              <label class="field-label" for="f_fecha_visita">
+                Fecha de Visita<span class="required">*</span>
+              </label>
+              <div class="date-input-wrap">
+                <input
+                  type="text"
+                  id="f_fecha_visita"
+                  class="field-input mono date-input"
+                  placeholder="DD/MM/AAAA"
+                  maxlength="10"
+                  inputmode="numeric"
+                  autocomplete="off"
+                >
+                <button type="button" class="date-cal-btn" data-target="f_fecha_visita" title="Abrir calendario">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </button>
+                <input type="date" id="f_fecha_visita_cal" class="date-hidden-cal" tabindex="-1">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_codigo_vinculado">
+                Código Proyecto (si existe)
+              </label>
+              <input
+                type="text"
+                id="f_codigo_vinculado"
+                class="field-input mono"
+                placeholder="Ej: 09-2025-12-001"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 1: INFORMACIÓN DE CONTACTO
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">👤</span>
+          <h2>Información de Contacto</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_nombre">
+                Nombre del Agricultor/a<span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="f_nombre"
+                class="field-input"
+                placeholder="Nombre completo"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_rut">
+                RUT
+                <span class="field-label-hint">(sin puntos, con guión)</span>
+              </label>
+              <input
+                type="text"
+                id="f_rut"
+                class="field-input mono"
+                placeholder="Ej: 12345678-9"
+                autocomplete="off"
+                maxlength="12"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_telefono">Teléfono Contacto</label>
+              <div class="phone-input-wrap">
+                <span class="phone-prefix">+56 9</span>
+                <input
+                  type="text"
+                  id="f_telefono"
+                  class="field-input mono"
+                  placeholder="XXXX XXXX"
+                  inputmode="numeric"
+                  maxlength="10"
+                  autocomplete="off"
+                >
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_email">Correo Electrónico</label>
+              <input
+                type="email"
+                id="f_email"
+                class="field-input"
+                placeholder="correo@ejemplo.cl"
+                autocomplete="off"
+                inputmode="email"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_n_grupo_familiar">N° Grupo Familiar</label>
+              <input
+                type="number"
+                id="f_n_grupo_familiar"
+                class="field-input mono"
+                placeholder="Ej: 4"
+                min="1"
+                max="99"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_otros_datos">Otros Datos</label>
+              <input
+                type="text"
+                id="f_otros_datos"
+                class="field-input"
+                placeholder="Información adicional de contacto"
+                autocomplete="off"
+              >
+            </div>
+
+            <!-- Región / Provincia / Comuna / Sector -->
+            <div class="field-group">
+              <label class="field-label">Región</label>
+              <input
+                type="text"
+                class="field-input"
+                value="Ñuble"
+                readonly
+                tabindex="-1"
+                style="background:var(--gray-100);color:var(--gray-600);"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_provincia">Provincia</label>
+              <select id="f_provincia" class="field-input field-select">
+                <option value="">— Seleccione provincia —</option>
+                <option value="Diguillín">Diguillín</option>
+                <option value="Punilla">Punilla</option>
+                <option value="Itata">Itata</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_comuna">Comuna</label>
+              <select id="f_comuna" class="field-input field-select">
+                <option value="">— Seleccione comuna —</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_sector">Sector</label>
+              <input
+                type="text"
+                id="f_sector"
+                class="field-input"
+                placeholder="Nombre del sector o localidad"
+                autocomplete="off"
+              >
+            </div>
+
+            <!-- Género -->
+            <div class="field-group">
+              <label class="field-label">Género</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="genero" value="Femenino">
+                  <span class="radio-label">Femenino</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="genero" value="Masculino">
+                  <span class="radio-label">Masculino</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Pueblos Originarios -->
+            <div class="field-group">
+              <label class="field-label">Pertenece a Pueblos Originarios</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="pueblos_originarios" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="pueblos_originarios" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group" id="grupo-cual-pueblo" style="display:none;">
+              <label class="field-label" for="f_cual_pueblo">¿Cuál pueblo?</label>
+              <input
+                type="text"
+                id="f_cual_pueblo"
+                class="field-input"
+                placeholder="Ej: Mapuche, Aymara…"
+                autocomplete="off"
+              >
+            </div>
+
+            <!-- Aporte del postulante -->
+            <div class="field-group field-group--wide">
+              <label class="field-label">Aporte del Postulante</label>
+              <div class="checkbox-group">
+                <label class="checkbox-option">
+                  <input type="checkbox" id="aporte_dinero" name="aporte" value="Dinero">
+                  <span class="checkbox-label">Aporte en dinero</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="aporte_bienes" name="aporte" value="Bienes comprados">
+                  <span class="checkbox-label">Aporte en bienes comprados</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="aporte_mano_obra" name="aporte" value="Mano de obra">
+                  <span class="checkbox-label">Aporte en mano de obra</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="aporte_otro" name="aporte" value="Otro">
+                  <span class="checkbox-label">Otro:</span>
+                </label>
+                <input
+                  type="text"
+                  id="f_aporte_otro_desc"
+                  class="field-input"
+                  placeholder="Especifique…"
+                  autocomplete="off"
+                  style="margin-left:28px;margin-top:4px;"
+                >
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">% Aporte del Agricultor</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="pct_aporte" value="Entre 5 y 10%">
+                  <span class="radio-label">Entre 5 y 10%</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="pct_aporte" value="Mayor al 10%">
+                  <span class="radio-label">Mayor al 10%</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Interés en programa especial -->
+            <div class="field-group field-group--wide">
+              <label class="field-label">¿El agricultor está interesado en participar en el programa especial de riego?</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="interes_programa" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="interes_programa" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+              </div>
+            </div>
+
+          </div><!-- /field-grid -->
+
+          <!-- Firma del Agricultor -->
+          <div class="firma-section">
+            <div class="firma-header">
+              <label class="field-label">Firma del Agricultor/a</label>
+              <div class="firma-actions">
+                <label class="checkbox-option firma-no-firma">
+                  <input type="checkbox" id="cb_no_firma">
+                  <span class="checkbox-label">No firma</span>
+                </label>
+                <button type="button" id="firma-clear-btn" class="btn-secondary-sm">
+                  Limpiar firma
+                </button>
+              </div>
+            </div>
+            <div class="firma-canvas-wrap" id="firma-canvas-wrap">
+              <canvas id="firma-canvas" class="firma-canvas" width="700" height="180"></canvas>
+              <div class="firma-placeholder" id="firma-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
+                <span>Firme aquí con el S-Pen o el dedo</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /section-body -->
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           COORDENADAS DE LA VIVIENDA
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">🏠</span>
+          <h2>Coordenadas de la Vivienda</h2>
+        </div>
+        <div class="section-body">
+          <div class="coords-block" id="coords-vivienda">
+            <div class="field-grid">
+              <div class="field-group">
+                <label class="field-label" for="f_viv_norte">Norte (UTM)</label>
+                <input type="text" id="f_viv_norte" class="field-input mono" placeholder="Ej: 5943820" inputmode="numeric" autocomplete="off">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f_viv_este">Este (UTM)</label>
+                <input type="text" id="f_viv_este" class="field-input mono" placeholder="Ej: 728650" inputmode="numeric" autocomplete="off">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f_viv_datum">Datum</label>
+                <input type="text" id="f_viv_datum" class="field-input mono" value="WGS84" readonly tabindex="-1" style="background:var(--gray-100);color:var(--gray-600);">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="f_viv_huso">Huso</label>
+                <select id="f_viv_huso" class="field-input field-select">
+                  <option value="19">19</option>
+                  <option value="18">18</option>
+                </select>
+              </div>
+            </div>
+            <div class="coords-btn-row">
+              <button type="button" class="btn-gps" data-coords-target="vivienda" title="Obtener ubicación GPS actual">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                  <path d="M12 8a4 4 0 100 8 4 4 0 000-8z"/>
+                </svg>
+                GPS Automático
+              </button>
+              <button type="button" class="btn-maps" data-coords-target="vivienda" title="Pegar coordenadas desde Google Maps">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                Pegar desde Maps
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 1: FUENTE DE AGUA
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">💧</span>
+          <h2>1. Fuente de Agua para el Riego</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_tipo_fuente_agua">
+                Tipo de Fuente de Agua
+              </label>
+              <input
+                type="text"
+                id="f_tipo_fuente_agua"
+                class="field-input"
+                placeholder="Canal, pozo, tranque, vertiente u otro"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+
+          <!-- Coordenadas captación -->
+          <div class="coords-subsection">
+            <div class="coords-subtitle">Coordenadas de la Captación</div>
+            <div class="coords-block" id="coords-captacion">
+              <div class="field-grid">
+                <div class="field-group">
+                  <label class="field-label" for="f_cap_norte">Norte (UTM)</label>
+                  <input type="text" id="f_cap_norte" class="field-input mono" placeholder="Ej: 5943820" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="f_cap_este">Este (UTM)</label>
+                  <input type="text" id="f_cap_este" class="field-input mono" placeholder="Ej: 728650" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="f_cap_datum">Datum</label>
+                  <input type="text" id="f_cap_datum" class="field-input mono" value="WGS84" readonly tabindex="-1" style="background:var(--gray-100);color:var(--gray-600);">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="f_cap_huso">Huso</label>
+                  <select id="f_cap_huso" class="field-input field-select">
+                    <option value="19">19</option>
+                    <option value="18">18</option>
+                  </select>
+                </div>
+              </div>
+              <div class="coords-btn-row">
+                <button type="button" class="btn-gps" data-coords-target="captacion">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                  </svg>
+                  GPS Automático
+                </button>
+                <button type="button" class="btn-maps" data-coords-target="captacion">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  Pegar desde Maps
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coordenadas del proyecto -->
+          <div class="coords-subsection">
+            <div class="coords-subtitle">Coordenadas del Proyecto</div>
+            <div class="coords-block" id="coords-proyecto">
+              <div class="field-grid">
+                <div class="field-group">
+                  <label class="field-label" for="f_proy_norte">Norte (UTM)</label>
+                  <input type="text" id="f_proy_norte" class="field-input mono" placeholder="Ej: 5943820" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="f_proy_este">Este (UTM)</label>
+                  <input type="text" id="f_proy_este" class="field-input mono" placeholder="Ej: 728650" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="f_proy_datum">Datum</label>
+                  <input type="text" id="f_proy_datum" class="field-input mono" value="WGS84" readonly tabindex="-1" style="background:var(--gray-100);color:var(--gray-600);">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="f_proy_huso">Huso</label>
+                  <select id="f_proy_huso" class="field-input field-select">
+                    <option value="19">19</option>
+                    <option value="18">18</option>
+                  </select>
+                </div>
+              </div>
+              <div class="coords-btn-row">
+                <button type="button" class="btn-gps" data-coords-target="proyecto">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                  </svg>
+                  GPS Automático
+                </button>
+                <button type="button" class="btn-maps" data-coords-target="proyecto">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  Pegar desde Maps
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-grid" style="margin-top:16px;">
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_caracteristicas_fuente">Características de la Fuente</label>
+              <textarea id="f_caracteristicas_fuente" class="field-textarea" rows="2" placeholder="Describa las características de la fuente…"></textarea>
+            </div>
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_obs_fuente">Observaciones</label>
+              <textarea id="f_obs_fuente" class="field-textarea" rows="2" placeholder="Complete en caso necesario…"></textarea>
+            </div>
+          </div>
+
+        </div><!-- /section-body -->
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 2: DERECHOS DE AGUA Y TENENCIA
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📜</span>
+          <h2>2. Derechos de Agua y Tenencia de la Tierra</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_tipo_tenencia_tierra">Tipo de Tenencia de la Tierra</label>
+              <div class="tenencia-row">
+                <input
+                  type="text"
+                  id="f_tipo_tenencia_tierra"
+                  class="field-input"
+                  placeholder="Ej: Propietario, arrendatario, usufructuario…"
+                  autocomplete="off"
+                >
+                <label class="checkbox-option docs-checkbox">
+                  <input type="checkbox" id="cb_docs_tierra">
+                  <span class="checkbox-label">Documentos a la vista</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_tipo_tenencia_agua">Tipo de Tenencia del Agua</label>
+              <div class="tenencia-row">
+                <input
+                  type="text"
+                  id="f_tipo_tenencia_agua"
+                  class="field-input"
+                  placeholder="Ej: Acción de canal, derecho propio, pozo…"
+                  autocomplete="off"
+                >
+                <label class="checkbox-option docs-checkbox">
+                  <input type="checkbox" id="cb_docs_agua">
+                  <span class="checkbox-label">Documentos a la vista</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_obs_tenencia">Observaciones</label>
+              <textarea id="f_obs_tenencia" class="field-textarea" rows="2" placeholder="Complete en caso necesario…"></textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 3: CORROBORACIÓN DE CAUDAL
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">🌊</span>
+          <h2>3. Corroboración de Caudal</h2>
+        </div>
+        <div class="section-body">
+
+          <!-- Tabla comparativa -->
+          <div class="caudal-table-wrap">
+            <table class="caudal-table">
+              <thead>
+                <tr>
+                  <th class="col-label"></th>
+                  <th>Situación Actual</th>
+                  <th>Situación con Proyecto</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="col-label">Cultivo Actual de Riego</td>
+                  <td><textarea id="f_cultivo_actual" class="table-textarea" rows="2" placeholder="Especifique…"></textarea></td>
+                  <td><textarea id="f_cultivo_proyecto" class="table-textarea" rows="2" placeholder="Especifique…"></textarea></td>
+                </tr>
+                <tr>
+                  <td class="col-label">Superficie Regada (Há o m²)</td>
+                  <td><input type="text" id="f_superficie_actual" class="table-input" placeholder="Ej: 5 Há" autocomplete="off"></td>
+                  <td><input type="text" id="f_superficie_proyecto" class="table-input" placeholder="Ej: 8 Há" autocomplete="off"></td>
+                </tr>
+                <tr>
+                  <td class="col-label">Método de Riego</td>
+                  <td><input type="text" id="f_metodo_actual" class="table-input" placeholder="Ej: Tendido, surco…" autocomplete="off"></td>
+                  <td><input type="text" id="f_metodo_proyecto" class="table-input" placeholder="Ej: Goteo, aspersión…" autocomplete="off"></td>
+                </tr>
+                <tr>
+                  <td class="col-label">Meses en que se Riega</td>
+                  <td><input type="text" id="f_meses_actual" class="table-input" placeholder="Ej: Nov-Mar" autocomplete="off"></td>
+                  <td><input type="text" id="f_meses_proyecto" class="table-input" placeholder="Ej: Oct-Abr" autocomplete="off"></td>
+                </tr>
+                <tr>
+                  <td class="col-label">Obras de Riego Existentes</td>
+                  <td><textarea id="f_obras_actual" class="table-textarea" rows="2" placeholder="Describa…"></textarea></td>
+                  <td><textarea id="f_obras_proyecto" class="table-textarea" rows="2" placeholder="Describa…"></textarea></td>
+                </tr>
+                <tr>
+                  <td class="col-label">Observaciones</td>
+                  <td colspan="2"><textarea id="f_obs_caudal" class="table-textarea" rows="2" placeholder="Complete en caso necesario…"></textarea></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 4: FUENTE DE ENERGÍA
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">⚡</span>
+          <h2>4. Fuente de Energía</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group field-group--wide">
+              <label class="field-label">Tipo de Fuente de Energía</label>
+              <div class="checkbox-group energia-grid">
+                <label class="checkbox-option">
+                  <input type="checkbox" id="energia_red_electrica" name="energia" value="Red eléctrica">
+                  <span class="checkbox-label">Red eléctrica</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="energia_solar_ongrid" name="energia" value="Solar On Grid">
+                  <span class="checkbox-label">Solar On Grid</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="energia_solar_offgrid" name="energia" value="Solar Off Grid">
+                  <span class="checkbox-label">Solar Off Grid</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="energia_otra" name="energia" value="Otra">
+                  <span class="checkbox-label">Otra</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Disponibilidad Red Eléctrica</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="red_electrica_disp" value="Disponible">
+                  <span class="radio-label">Disponible</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="red_electrica_disp" value="Proyectada">
+                  <span class="radio-label">Proyectada</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_energia_desc">Descripción / Observaciones Energía</label>
+              <textarea id="f_energia_desc" class="field-textarea" rows="2" placeholder="Describa si corresponde…"></textarea>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 5: OTROS DATOS
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📋</span>
+          <h2>5. Otros Datos</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group">
+              <label class="field-label">¿Participa en programa INDAP?</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="indap_participa" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="indap_participa" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">¿Agricultor acreditado INDAP?</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="indap_acreditado" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="indap_acreditado" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">¿Con inicio de actividades?</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="inicio_actividades" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="inicio_actividades" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">¿Proyecto incluye IVA?</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="incluye_iva" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="incluye_iva" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">¿Con consultor/a?</label>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="con_consultor" value="Sí">
+                  <span class="radio-label">Sí</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="con_consultor" value="No">
+                  <span class="radio-label">No</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-group field-group--wide" id="grupo-consultor" style="display:none;">
+              <label class="field-label" for="f_nombre_consultor">Nombre del Consultor/a</label>
+              <input
+                type="text"
+                id="f_nombre_consultor"
+                class="field-input"
+                placeholder="Nombre completo del consultor/a"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 6: DATOS DEL ENCUESTADOR
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">👷</span>
+          <h2>6. Datos del Encuestador/a</h2>
+        </div>
+        <div class="section-body">
+          <div class="field-grid">
+
+            <div class="field-group">
+              <label class="field-label" for="f_nombre_encuestador">Nombre Encuestador/a</label>
+              <input
+                type="text"
+                id="f_nombre_encuestador"
+                class="field-input"
+                placeholder="Nombre completo"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="f_cargo_encuestador">Cargo</label>
+              <input
+                type="text"
+                id="f_cargo_encuestador"
+                class="field-input"
+                placeholder="Cargo del funcionario/a"
+                autocomplete="off"
+              >
+            </div>
+
+            <div class="field-group field-group--wide">
+              <label class="field-label" for="f_contacto_encuestador">Datos de Contacto</label>
+              <input
+                type="text"
+                id="f_contacto_encuestador"
+                class="field-input"
+                placeholder="Teléfono o correo del encuestador/a"
+                autocomplete="off"
+              >
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 7: OBSERVACIONES GENERALES
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📝</span>
+          <h2>7. Observaciones Generales</h2>
+        </div>
+        <div class="section-body">
+          <textarea
+            id="f_observaciones_generales"
+            class="field-textarea"
+            rows="5"
+            placeholder="Observaciones generales de la visita…"
+            style="width:100%;"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           SECCIÓN 8: DIBUJO ESQUEMÁTICO (RESERVADO)
+           ════════════════════════════════════════════════ -->
+      <div class="form-section section-reserved">
+        <div class="section-header">
+          <span class="section-icon">🗺️</span>
+          <h2>8. Dibujo Esquemático</h2>
+        </div>
+        <div class="section-body">
+          <div class="reserved-placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40" style="opacity:.4;">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M9 21V9"/>
+            </svg>
+            <p>
+              <strong>Dibujo esquemático — Próximamente</strong><br>
+              <span>Esta sección permitirá dibujar sobre una captura de Google Maps con el S-Pen, marcando límites prediales, fuente de agua, accesos y obras.</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           FOTO DEL AGRICULTOR CON COORDENADAS
+           ════════════════════════════════════════════════ -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-icon">📸</span>
+          <h2>Foto de Referencia</h2>
+          <span class="section-subtitle">Fotografíe al agricultor/a con las coordenadas visibles para referencia futura</span>
+        </div>
+        <div class="section-body">
+          <div id="foto-referencia-wrap" class="foto-single-wrap">
+            <!-- Área de foto vacía -->
+            <div id="foto-empty" class="foto-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span>Sin foto</span>
+            </div>
+            <!-- Preview de foto -->
+            <div id="foto-preview" class="foto-preview" style="display:none;">
+              <img id="foto-img" src="" alt="Foto de referencia">
+              <div class="foto-meta">
+                <input type="text" id="f_foto_caption" class="field-input" placeholder="Pie de foto…" autocomplete="off">
+                <button type="button" id="foto-remove-btn" class="foto-remove-btn" title="Eliminar foto">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                  </svg>
+                  Eliminar foto
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="foto-btn-row">
+            <button type="button" id="foto-camera-btn" class="btn-photo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              Tomar Foto
+            </button>
+            <button type="button" id="foto-gallery-btn" class="btn-photo btn-photo--secondary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              Desde Galería
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════
+           BARRA DE ACCIONES
+           ════════════════════════════════════════════════ -->
+      <div class="action-bar" id="action-bar" style="display:none;">
+        <button id="save-btn" class="action-btn primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Guardar
+        </button>
+        <button id="export-csv-btn" class="action-btn secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Exportar CSV
+        </button>
+        <button id="export-all-csv-btn" class="action-btn secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Exportar Todos
+        </button>
+        <button id="delete-btn" class="action-btn danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+          </svg>
+          Eliminar
+        </button>
+      </div>
+
+    </div><!-- /form-wrapper -->
+  </div><!-- /form-area -->
+</div><!-- /main-layout -->
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: POST GUARDADO
+     ════════════════════════════════════════════════════════ -->
+<div id="modal-post-save" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-icon">✅</div>
+    <h3 class="modal-title">Ficha guardada correctamente</h3>
+    <p class="modal-body">¿Qué desea hacer ahora?</p>
+    <div class="modal-footer modal-footer--col">
+      <button id="modal-nueva-ficha" class="action-btn primary">
+        Nueva Ficha de Visita
+      </button>
+      <button id="modal-ver-registros" class="action-btn secondary">
+        Ver Mis Fichas
+      </button>
+      <button id="modal-continuar" class="action-btn ghost">
+        Continuar Editando
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: CONFIRMAR ELIMINACIÓN
+     ════════════════════════════════════════════════════════ -->
+<div id="modal-confirm-delete" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <h3 class="modal-title">¿Eliminar esta ficha?</h3>
+    <p class="modal-body" id="modal-delete-name" style="font-weight:600;color:var(--cnr-red);"></p>
+    <p class="modal-body">Esta acción no se puede deshacer en el dispositivo.</p>
+    <div class="modal-footer">
+      <button id="modal-delete-cancel" class="action-btn secondary">Cancelar</button>
+      <button id="modal-delete-confirm" class="action-btn danger">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: ADVERTENCIA RUT
+     ════════════════════════════════════════════════════════ -->
+<div id="modal-warn-rut" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-icon">⚠️</div>
+    <h3 class="modal-title">RUT no ingresado</h3>
+    <p class="modal-body">El RUT del agricultor/a no ha sido completado. Se recomienda ingresarlo para una correcta identificación de la ficha.</p>
+    <p class="modal-body">¿Desea guardar de todas formas?</p>
+    <div class="modal-footer">
+      <button id="modal-rut-cancel" class="action-btn secondary">Volver a completar</button>
+      <button id="modal-rut-confirm" class="action-btn primary">Guardar sin RUT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MODAL: ADVERTENCIA FIRMA
+     ════════════════════════════════════════════════════════ -->
+<div id="modal-warn-firma" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-icon">✍️</div>
+    <h3 class="modal-title">Firma no registrada</h3>
+    <p class="modal-body">El agricultor/a no ha firmado la ficha y no se marcó "No firma". La firma es un campo importante para la validez del registro.</p>
+    <p class="modal-body">¿Desea guardar de todas formas?</p>
+    <div class="modal-footer">
+      <button id="modal-firma-cancel" class="action-btn secondary">Volver a firmar</button>
+      <button id="modal-firma-confirm" class="action-btn primary">Guardar sin firma</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast container ────────────────────────────────── -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ── Scripts ────────────────────────────────────────── -->
+<script src="app_demanda.js"></script>
+
+<script>
+'use strict';
+
+/* ── Comunas de Ñuble por provincia ──────────────────── */
+const COMUNAS_NUBLE = {
+  'Diguillín': ['Chillán','Bulnes','Chillán Viejo','El Carmen','Pemuco','Pinto','Quillón','San Ignacio','Yungay'],
+  'Punilla':   ['San Carlos','Coihueco','Ñiquén','San Fabián','San Nicolás'],
+  'Itata':     ['Quirihue','Cobquecura','Coelemu','Ninhue','Portezuelo','Ránquil','Trehuaco'],
+};
+
+window.updateComunasDemanda = function(provincia) {
+  const sel = document.getElementById('f_comuna');
+  sel.innerHTML = '<option value="">— Seleccione comuna —</option>';
+  (COMUNAS_NUBLE[provincia] || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+};
+
+document.getElementById('f_provincia')?.addEventListener('change', (e) => {
+  window.updateComunasDemanda(e.target.value);
+});
+
+/* ── Campos de fecha DD/MM/AAAA ─────────────────────── */
+document.querySelectorAll('.date-input').forEach(input => {
+  input.addEventListener('input', (e) => {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length > 2) v = v.slice(0,2) + '/' + v.slice(2);
+    if (v.length > 5) v = v.slice(0,5) + '/' + v.slice(5);
+    if (v.length > 10) v = v.slice(0,10);
+    e.target.value = v;
+  });
+});
+
+document.querySelectorAll('.date-cal-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const calInput = document.getElementById(btn.dataset.target + '_cal');
+    if (calInput) calInput.showPicker ? calInput.showPicker() : calInput.click();
+  });
+});
+
+document.querySelectorAll('.date-hidden-cal').forEach(cal => {
+  cal.addEventListener('change', () => {
+    const visible = document.getElementById(cal.id.replace('_cal',''));
+    if (visible && cal.value) {
+      const [y,m,d] = cal.value.split('-');
+      visible.value = `${d}/${m}/${y}`;
+    }
+  });
+});
+
+/* ── Pueblos originarios: mostrar/ocultar cuál ───────── */
+document.querySelectorAll('input[name="pueblos_originarios"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const grupo = document.getElementById('grupo-cual-pueblo');
+    if (grupo) grupo.style.display = r.value === 'Sí' ? 'flex' : 'none';
+  });
+});
+
+/* ── Consultor: mostrar/ocultar nombre ───────────────── */
+document.querySelectorAll('input[name="con_consultor"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const grupo = document.getElementById('grupo-consultor');
+    if (grupo) grupo.style.display = r.value === 'Sí' ? 'flex' : 'none';
+  });
+});
+
+/* ── Wake Lock ───────────────────────────────────────── */
+let _wakeLock = null;
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try { _wakeLock = await navigator.wakeLock.request('screen'); }
+    catch(e) { console.warn('[WakeLock]', e.message); }
+  }
+}
+requestWakeLock();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') requestWakeLock();
+});
+
+/* ── Sidebar hamburguesa ─────────────────────────────── */
+const _hamburger = document.getElementById('hamburger-btn');
+const _sidebar   = document.getElementById('records-sidebar');
+const _overlay   = document.getElementById('sidebar-overlay');
+
+function openSidebar()  { _sidebar.classList.add('mobile-visible');    _overlay.classList.add('visible');    document.body.style.overflow='hidden'; }
+function closeSidebar() { _sidebar.classList.remove('mobile-visible'); _overlay.classList.remove('visible'); document.body.style.overflow=''; }
+
+_hamburger?.addEventListener('click', () => _sidebar.classList.contains('mobile-visible') ? closeSidebar() : openSidebar());
+_overlay?.addEventListener('click', closeSidebar);
+document.getElementById('records-list')?.addEventListener('click', () => { if(window.innerWidth<=900) closeSidebar(); });
+
+/* ── Action bar: observer sobre form-wrapper ─────────── */
+const _actionBar = document.getElementById('action-bar');
+const _formWrap  = document.getElementById('form-wrapper');
+if (_formWrap && _actionBar) {
+  new MutationObserver(() => {
+    _actionBar.style.display = _formWrap.style.display !== 'none' ? 'flex' : 'none';
+  }).observe(_formWrap, { attributes: true, attributeFilter: ['style'] });
+}
+
+/* ── Service Worker ──────────────────────────────────── */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/cnr-seguimiento/service-worker.js')
+    .then(r => console.log('[SW] Registrado:', r.scope))
+    .catch(e => console.warn('[SW] Error:', e));
+}
+</script>
+
+</body>
+</html>
