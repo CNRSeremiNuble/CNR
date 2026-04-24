@@ -7,7 +7,7 @@
 
 const CACHE_NAME    = 'cnr-seguimiento-v1';
 const OFFLINE_URLS  = [
-  '/',
+  '/cnr-seguimiento',
   '/index.html',
   '/css/styles.css',
   '/js/app.js',
