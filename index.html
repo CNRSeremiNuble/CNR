@@ -137,19 +137,71 @@
 
             <div class="field-group">
               <label class="field-label" for="f_fecha_recepcion">Fecha Recepción Técnica</label>
-              <input type="date" id="f_fecha_recepcion" class="field-input">
+              <div class="date-input-wrap">
+                <input
+                  type="text"
+                  id="f_fecha_recepcion"
+                  class="field-input mono date-input"
+                  placeholder="DD/MM/AAAA"
+                  maxlength="10"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  data-field="fecha_recepcion"
+                >
+                <button type="button" class="date-cal-btn" data-target="f_fecha_recepcion" title="Abrir calendario">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </button>
+                <input type="date" id="f_fecha_recepcion_cal" class="date-hidden-cal" tabindex="-1">
+              </div>
             </div>
 
             <div class="field-group">
-              <label class="field-label" for="f_fecha_visita">
-                Fecha de Visita<span class="required">*</span>
-              </label>
-              <input type="date" id="f_fecha_visita" class="field-input">
+              <label class="field-label" for="f_fecha_visita">Fecha de Visita<span class="required">*</span></label>
+              <div class="date-input-wrap">
+                <input
+                  type="text"
+                  id="f_fecha_visita"
+                  class="field-input mono date-input"
+                  placeholder="DD/MM/AAAA"
+                  maxlength="10"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  data-field="fecha_visita"
+                >
+                <button type="button" class="date-cal-btn" data-target="f_fecha_visita" title="Abrir calendario">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </button>
+                <input type="date" id="f_fecha_visita_cal" class="date-hidden-cal" tabindex="-1">
+              </div>
             </div>
 
             <div class="field-group">
               <label class="field-label" for="f_fecha_pago">Fecha de Pago</label>
-              <input type="date" id="f_fecha_pago" class="field-input">
+              <div class="date-input-wrap">
+                <input
+                  type="text"
+                  id="f_fecha_pago"
+                  class="field-input mono date-input"
+                  placeholder="DD/MM/AAAA"
+                  maxlength="10"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  data-field="fecha_pago"
+                >
+                <button type="button" class="date-cal-btn" data-target="f_fecha_pago" title="Abrir calendario">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </button>
+                <input type="date" id="f_fecha_pago_cal" class="date-hidden-cal" tabindex="-1">
+              </div>
             </div>
 
             <div class="field-group">
@@ -221,47 +273,31 @@
 
             <div class="field-group">
               <label class="field-label" for="f_region">Región</label>
-              <select id="f_region" class="field-select">
-                <option value="">— Seleccione —</option>
-                <option value="Arica y Parinacota">Arica y Parinacota</option>
-                <option value="Tarapacá">Tarapacá</option>
-                <option value="Antofagasta">Antofagasta</option>
-                <option value="Atacama">Atacama</option>
-                <option value="Coquimbo">Coquimbo</option>
-                <option value="Valparaíso">Valparaíso</option>
-                <option value="Metropolitana">Metropolitana</option>
-                <option value="O'Higgins">O'Higgins</option>
-                <option value="Maule">Maule</option>
-                <option value="Ñuble">Ñuble</option>
-                <option value="Biobío">Biobío</option>
-                <option value="La Araucanía">La Araucanía</option>
-                <option value="Los Ríos">Los Ríos</option>
-                <option value="Los Lagos">Los Lagos</option>
-                <option value="Aysén">Aysén</option>
-                <option value="Magallanes">Magallanes</option>
-              </select>
+              <input
+                type="text"
+                id="f_region"
+                class="field-input"
+                value="Ñuble"
+                readonly
+                style="background:var(--gray-100);color:var(--gray-600);cursor:default;"
+              >
             </div>
 
             <div class="field-group">
               <label class="field-label" for="f_provincia">Provincia</label>
-              <input
-                type="text"
-                id="f_provincia"
-                class="field-input"
-                placeholder="Ej: Punilla"
-                autocomplete="off"
-              >
+              <select id="f_provincia" class="field-select" onchange="updateComunas(this.value)">
+                <option value="">— Seleccione provincia —</option>
+                <option value="Diguillín">Diguillín</option>
+                <option value="Punilla">Punilla</option>
+                <option value="Itata">Itata</option>
+              </select>
             </div>
 
             <div class="field-group">
               <label class="field-label" for="f_comuna">Comuna</label>
-              <input
-                type="text"
-                id="f_comuna"
-                class="field-input"
-                placeholder="Ej: Coihueco"
-                autocomplete="off"
-              >
+              <select id="f_comuna" class="field-select">
+                <option value="">— Seleccione provincia primero —</option>
+              </select>
             </div>
 
           </div>
@@ -319,7 +355,7 @@
 
           </div>
 
-          <div style="margin-top:14px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <div style="margin-top:14px; display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
             <button id="gps-btn" class="utm-btn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
@@ -328,24 +364,19 @@
               </svg>
               Obtener GPS
             </button>
-            <span style="font-size:.78rem;color:var(--gray-500);">
-              Captura automática desde GPS del dispositivo (WGS84 → UTM Zona 19)
+            <button id="maps-btn" class="utm-btn" style="background:var(--cnr-green-bg);border-color:var(--cnr-green);color:var(--cnr-green);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              Pegar desde Maps
+            </button>
+            <span style="font-size:.75rem;color:var(--gray-500);align-self:center;max-width:260px;">
+              GPS: captura automática · Maps: pegue coordenadas decimales del pin
             </span>
           </div>
 
-          <div class="divider" style="margin:16px 0;"></div>
-          <div class="field-grid">
-            <div class="field-group">
-              <label class="field-label" for="f_uso">Uso</label>
-              <input
-                type="text"
-                id="f_uso"
-                class="field-input"
-                placeholder="Ej: 19"
-                autocomplete="off"
-              >
-            </div>
-          </div>
+          <!-- Campo USO eliminado: era duplicado de HUSO -->
         </div>
       </div>
 
@@ -551,14 +582,25 @@
     JSON
   </button>
 
-  <button id="export-csv-btn" class="action-btn secondary" title="Exportar como CSV (para Access)">
+  <button id="export-csv-btn" class="action-btn secondary" title="Exportar registro actual como CSV">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
       <polyline points="14 2 14 8 20 8"/>
       <line x1="8" y1="13" x2="16" y2="13"/>
       <line x1="8" y1="17" x2="16" y2="17"/>
     </svg>
-    CSV / Access
+    CSV Este
+  </button>
+
+  <button id="export-all-csv-btn" class="action-btn secondary" title="Exportar TODOS los registros en un CSV consolidado">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="8" y1="11" x2="16" y2="11"/>
+      <line x1="8" y1="15" x2="16" y2="15"/>
+      <line x1="8" y1="19" x2="16" y2="19"/>
+    </svg>
+    CSV Todos
   </button>
 
   <button id="save-btn" class="action-btn primary">
@@ -635,6 +677,122 @@
     document.getElementById('new-record-btn')?.addEventListener('click', () => {
       if (window.innerWidth <= 900) setTimeout(closeSidebar, 150);
     }, true);
+
+  // ── Comunas de Ñuble por provincia ──────────────────────
+  const COMUNAS_NUBLE = {
+    'Diguillín': ['Chillán','Bulnes','Chillán Viejo','El Carmen','Pemuco','Pinto','Quillón','San Ignacio','Yungay'],
+    'Punilla':   ['San Carlos','Coihueco','Ñiquén','San Fabián','San Nicolás'],
+    'Itata':     ['Quirihue','Cobquecura','Coelemu','Ninhue','Portezuelo','Ránquil','Trehuaco'],
+  };
+
+  window.updateComunas = function(provincia) {
+    const sel = document.getElementById('f_comuna');
+    sel.innerHTML = '<option value="">— Seleccione comuna —</option>';
+    const lista = COMUNAS_NUBLE[provincia] || [];
+    lista.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  };
+
+  // ── Campos de fecha con formato DD/MM/AAAA ────────────────
+  function initDateInputs() {
+    document.querySelectorAll('.date-input').forEach(input => {
+      // Formato automático al escribir
+      input.addEventListener('input', (e) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 2)  v = v.slice(0,2) + '/' + v.slice(2);
+        if (v.length > 5)  v = v.slice(0,5) + '/' + v.slice(5);
+        if (v.length > 10) v = v.slice(0,10);
+        e.target.value = v;
+      });
+    });
+
+    // Botones de calendario
+    document.querySelectorAll('.date-cal-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target;
+        const calId    = targetId + '_cal';
+        const calInput = document.getElementById(calId);
+        if (calInput) {
+          calInput.showPicker ? calInput.showPicker() : calInput.click();
+        }
+      });
+    });
+
+    // Cuando el calendario oculto cambia, llenar el campo de texto
+    document.querySelectorAll('.date-hidden-cal').forEach(cal => {
+      cal.addEventListener('change', () => {
+        const visibleId = cal.id.replace('_cal', '');
+        const visible   = document.getElementById(visibleId);
+        if (visible && cal.value) {
+          const [y,m,d] = cal.value.split('-');
+          visible.value = `${d}/${m}/${y}`;
+        }
+      });
+    });
+  }
+  initDateInputs();
+
+  // ── Wake Lock: evitar que la pantalla se apague ───────────
+  let wakeLock = null;
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        console.log('[WakeLock] Pantalla activa');
+        wakeLock.addEventListener('release', () => {
+          console.log('[WakeLock] Liberado');
+        });
+      } catch (err) {
+        console.warn('[WakeLock] No disponible:', err.message);
+      }
+    }
+  }
+  requestWakeLock();
+
+  // Reactivar wake lock cuando la página vuelve a ser visible
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+
+  // ── Pegar coordenadas desde Google Maps ──────────────────
+  document.getElementById('maps-btn')?.addEventListener('click', async () => {
+    let texto = '';
+    try {
+      texto = await navigator.clipboard.readText();
+    } catch {
+      texto = prompt('Pegue las coordenadas de Google Maps (ej: -36.641, -71.943):') || '';
+    }
+    if (!texto) return;
+
+    // Formatos soportados: "-36.641, -71.943" o "-36.641431,-71.943107" o "lat, lon"
+    const match = texto.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+    if (!match) {
+      window.dispatchEvent(new CustomEvent('cnr:toast',{detail:{msg:'Formato no reconocido. Copie el pin directamente desde Google Maps.',type:'error'}}));
+      return;
+    }
+    const lat = parseFloat(match[1]);
+    const lon = parseFloat(match[2]);
+
+    // Determinar cuál es lat y cuál lon (Chile: lat entre -17 y -56, lon entre -65 y -76)
+    let latFinal = lat, lonFinal = lon;
+    if (Math.abs(lon) < Math.abs(lat) && lon > -80 && lon < 0) {
+      // Ya están en orden correcto
+    } else if (lat > -80 && lat < 0 && lon < -60) {
+      latFinal = lat; lonFinal = lon;
+    }
+
+    const {easting, northing} = latLonToUTM(latFinal, lonFinal);
+    document.getElementById('f_utm_este').value  = easting.toFixed(0);
+    document.getElementById('f_utm_norte').value = northing.toFixed(0);
+    if (State && State.currentRecord) {
+      State.currentRecord.utm_este  = easting.toFixed(0);
+      State.currentRecord.utm_norte = northing.toFixed(0);
+    }
+    window.dispatchEvent(new CustomEvent('cnr:toast',{detail:{msg:'Coordenadas importadas desde Maps ✓',type:'success'}}));
+  });
 
   // Registrar Service Worker
     if ('serviceWorker' in navigator) {
