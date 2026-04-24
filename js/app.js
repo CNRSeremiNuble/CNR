@@ -9,7 +9,7 @@
    CONFIGURACIÓN — editar antes de desplegar
    ══════════════════════════════════════════════════════════ */
 const CONFIG = {
-  GOOGLE_CLIENT_ID:  'TU_CLIENT_ID.apps.googleusercontent.com', // ← reemplazar
+  GOOGLE_CLIENT_ID:  '353831203919-9uf4jmk8he5df4dvvpdoq0dle1jmeiju.apps.googleusercontent.com',
   DRIVE_FOLDER_NAME: 'CNR_Seguimiento',
   DB_NAME:           'cnr_seguimiento',
   DB_VERSION:        1,
