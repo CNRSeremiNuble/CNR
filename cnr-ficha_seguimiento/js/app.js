@@ -257,6 +257,11 @@ function loadRecordToForm(record) {
   }
 
   document.getElementById('no-record-msg').style.display = 'none';
+   // Actualizar etiqueta del botón descartar/cerrar
+  const discardLabel = document.getElementById('discard-btn-label');
+  if (discardLabel) {
+    discardLabel.textContent = (record._modified_count === 0) ? 'Descartar' : 'Cerrar';
+  }
   document.getElementById('form-wrapper').style.display  = 'flex';
 }
 
@@ -781,7 +786,42 @@ function bindFormEvents() {
       _pendingDeleteRecord = null;
     }
   });
+   // Botón Descartar / Cerrar
+  document.getElementById('discard-btn')?.addEventListener('click', () => {
+    if (!State.currentRecord) return;
+    const isNew = State.currentRecord._modified_count === 0;
+    if (isNew) {
+      // Ficha nunca guardada → mostrar modal de confirmación
+      document.getElementById('modal-confirm-discard')?.classList.add('open');
+    } else {
+      // Ficha ya guardada → cerrar sin borrar
+      State.currentRecord = null;
+      document.getElementById('no-record-msg').style.display  = 'flex';
+      document.getElementById('form-wrapper').style.display   = 'none';
+      document.getElementById('action-bar').style.display     = 'none';
+      document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active'));
+    }
+  });
 
+  // Modal descartar — Volver
+  document.getElementById('modal-discard-cancel')?.addEventListener('click', () => {
+    document.getElementById('modal-confirm-discard')?.classList.remove('open');
+  });
+
+  // Modal descartar — Confirmar
+  document.getElementById('modal-discard-confirm')?.addEventListener('click', async () => {
+    document.getElementById('modal-confirm-discard')?.classList.remove('open');
+    if (!State.currentRecord) return;
+    // Eliminar de IndexedDB y memoria
+    await dbDelete(State.currentRecord._id);
+    State.records = State.records.filter(r => r._id !== State.currentRecord._id);
+    State.currentRecord = null;
+    document.getElementById('no-record-msg').style.display  = 'flex';
+    document.getElementById('form-wrapper').style.display   = 'none';
+    document.getElementById('action-bar').style.display     = 'none';
+    renderRecordsList();
+    showToast('Ficha descartada', 'info');
+  });
   // Botón eliminar en action bar
   document.getElementById('delete-btn')?.addEventListener('click', () => {
     if (!State.currentRecord) return;
