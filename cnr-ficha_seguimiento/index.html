@@ -469,7 +469,7 @@
         </div>
         <div class="section-body">
 
-          <div class="field-group" style="margin-bottom:24px;">
+         <div class="field-group" style="margin-bottom:24px;">
             <label class="field-label">Tiempo de Funcionamiento de Obra</label>
             <div class="tiempo-row">
               <input
@@ -482,7 +482,27 @@
                 placeholder="0"
               >
               <span class="tiempo-unit">años</span>
+              <button
+                type="button"
+                id="recalcular-tiempo-btn"
+                title="Recalcular desde fechas de recepción y visita"
+                style="
+                  display:flex; align-items:center; gap:6px;
+                  background:var(--white); color:var(--cnr-blue);
+                  border:1.5px solid var(--cnr-blue); border-radius:var(--radius-sm);
+                  padding:8px 12px; font-family:var(--font-main);
+                  font-size:.8rem; font-weight:600; cursor:pointer;
+                  min-height:38px; margin-left:8px; transition:background .2s;
+                "
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+                Recalcular
+              </button>
             </div>
+            <div id="tiempo-calc-info" style="font-size:.75rem;color:var(--gray-500);margin-top:4px;display:none;"></div>
           </div>
 
           <div class="field-group">
@@ -881,6 +901,88 @@
     window.dispatchEvent(new CustomEvent('cnr:toast',{detail:{msg:'Coordenadas importadas desde Maps ✓',type:'success'}}));
   });
 
+// ── Recalcular tiempo de funcionamiento ──────────────
+  function calcularTiempoFuncionamiento() {
+    const recepcionEl = document.getElementById('f_fecha_recepcion');
+    const visitaEl    = document.getElementById('f_fecha_visita');
+    const tiempoEl    = document.getElementById('f_tiempo_funcionamiento');
+    const infoEl      = document.getElementById('tiempo-calc-info');
+
+    if (!recepcionEl || !visitaEl || !tiempoEl) return;
+
+    const recepcionStr = recepcionEl.value.trim();
+    const visitaStr    = visitaEl.value.trim();
+
+    // Validar formato DD/MM/AAAA
+    const reFecha = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const mR = recepcionStr.match(reFecha);
+    const mV = visitaStr.match(reFecha);
+
+    if (!mR || !mV) {
+      if (infoEl) {
+        infoEl.textContent = 'Complete ambas fechas para calcular automáticamente.';
+        infoEl.style.display = 'block';
+      }
+      return;
+    }
+
+    const fechaRecepcion = new Date(`${mR[3]}-${mR[2]}-${mR[1]}`);
+    const fechaVisita    = new Date(`${mV[3]}-${mV[2]}-${mV[1]}`);
+
+    if (isNaN(fechaRecepcion) || isNaN(fechaVisita)) {
+      if (infoEl) { infoEl.textContent = 'Fecha inválida.'; infoEl.style.display = 'block'; }
+      return;
+    }
+
+    if (fechaVisita < fechaRecepcion) {
+      if (infoEl) {
+        infoEl.textContent = '⚠ La fecha de visita es anterior a la de recepción.';
+        infoEl.style.display = 'block';
+        infoEl.style.color = 'var(--cnr-red)';
+      }
+      return;
+    }
+
+    // Calcular años completos
+    let anos = fechaVisita.getFullYear() - fechaRecepcion.getFullYear();
+    const mDiff = fechaVisita.getMonth() - fechaRecepcion.getMonth();
+    if (mDiff < 0 || (mDiff === 0 && fechaVisita.getDate() < fechaRecepcion.getDate())) {
+      anos--;
+    }
+
+    tiempoEl.value = anos;
+
+    if (infoEl) {
+      infoEl.textContent = `Calculado: desde ${recepcionStr} hasta ${visitaStr} = ${anos} año${anos !== 1 ? 's' : ''} completo${anos !== 1 ? 's' : ''}.`;
+      infoEl.style.display = 'block';
+      infoEl.style.color = 'var(--gray-500)';
+    }
+
+    // Actualizar en el registro actual si existe
+    if (typeof State !== 'undefined' && State.currentRecord) {
+      State.currentRecord.tiempo_funcionamiento = anos;
+    }
+  }
+
+  // Calcular automáticamente al cambiar fechas (solo si el campo está vacío)
+  document.getElementById('f_fecha_recepcion')?.addEventListener('change', () => {
+    const tiempoEl = document.getElementById('f_tiempo_funcionamiento');
+    if (tiempoEl && (tiempoEl.value === '' || tiempoEl.value === '0')) {
+      calcularTiempoFuncionamiento();
+    }
+  });
+  document.getElementById('f_fecha_visita')?.addEventListener('change', () => {
+    const tiempoEl = document.getElementById('f_tiempo_funcionamiento');
+    if (tiempoEl && (tiempoEl.value === '' || tiempoEl.value === '0')) {
+      calcularTiempoFuncionamiento();
+    }
+  });
+
+  // Botón recalcular — siempre recalcula al presionar
+  document.getElementById('recalcular-tiempo-btn')?.addEventListener('click', () => {
+    calcularTiempoFuncionamiento();
+  });
+    
   // Registrar Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/CNR/service-worker.js')
