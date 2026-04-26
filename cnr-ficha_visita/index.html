@@ -189,9 +189,9 @@
 <div class="main-layout">
 
   <aside class="records-sidebar" id="records-sidebar">
-    <div class="sidebar-header">
+   <div class="sidebar-header">
       <div class="sidebar-title">📋 Registros</div>
-      <button class="new-record-btn" id="new-record-btn">
+      <button class="new-record-btn" id="new-record-btn" style="margin-top:8px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -336,10 +336,14 @@
           <div class="firma-section">
             <div class="firma-header">
               <label class="field-label">Firma del Agricultor/a</label>
-              <div class="firma-actions">
+            <div class="firma-actions">
                 <label class="checkbox-option firma-no-firma">
                   <input type="checkbox" id="cb_no_firma">
                   <span class="checkbox-label">No firma</span>
+                </label>
+                <label class="checkbox-option firma-no-firma" id="cb_bloquear_firma_wrap" style="display:none;">
+                  <input type="checkbox" id="cb_bloquear_firma">
+                  <span class="checkbox-label">🔒 Bloquear firma</span>
                 </label>
                 <button type="button" id="firma-clear-btn" class="btn-secondary-sm">Limpiar firma</button>
               </div>
@@ -810,6 +814,13 @@ window.updateComunasDemanda = function(provincia) {
 };
 document.getElementById('f_provincia')?.addEventListener('change', (e) => window.updateComunasDemanda(e.target.value));
 
+/* ── Detectar firma completada para mostrar botón bloquear ── */
+document.getElementById('firma-canvas')?.addEventListener('pointerup', () => {
+  const wrap = document.getElementById('cb_bloquear_firma_wrap');
+  const cbNoFirma = document.getElementById('cb_no_firma');
+  if (wrap && !cbNoFirma?.checked) wrap.style.display = 'flex';
+});
+  
 /* ── Email: bloquear espacios ─────────────────────────── */
 document.getElementById('f_email')?.addEventListener('keydown', (e) => {
   if (e.key === ' ') e.preventDefault();
@@ -849,6 +860,20 @@ document.querySelectorAll('input[name="pueblos_originarios"]').forEach(r => {
   });
 });
 
+/* ── Limpiar firma: resetear bloqueo ─────────────────── */
+document.getElementById('firma-clear-btn')?.addEventListener('click', () => {
+  const cbBloquear = document.getElementById('cb_bloquear_firma');
+  const wrap       = document.getElementById('cb_bloquear_firma_wrap');
+  const canvas     = document.getElementById('firma-canvas');
+  const clearBtn   = document.getElementById('firma-clear-btn');
+  const canvasWrap = document.getElementById('firma-canvas-wrap');
+  if (cbBloquear) cbBloquear.checked = false;
+  if (wrap)       wrap.style.display = 'none';
+  if (canvas)     canvas.style.pointerEvents = 'auto';
+  if (clearBtn)   clearBtn.disabled = false;
+  if (canvasWrap) canvasWrap.style.outline = 'none';
+}, true); // true = captura antes que el listener de app_demanda.js
+  
 /* ── Wake Lock ───────────────────────────────────────── */
 let _wakeLock = null;
 async function requestWakeLock() {
@@ -1037,6 +1062,30 @@ document.getElementById('foto-crop-confirm-btn')?.addEventListener('click',() =>
 /* ── Exponer CropModule globalmente para app_demanda.js ─ */
 window.CropModule = CropModule;
 
+/* ── Bloquear firma una vez dibujada ─────────────────── */
+document.getElementById('cb_bloquear_firma')?.addEventListener('change', (e) => {
+  const canvas  = document.getElementById('firma-canvas');
+  const clearBtn= document.getElementById('firma-clear-btn');
+  const wrap    = document.getElementById('firma-canvas-wrap');
+  if (e.target.checked) {
+    // Bloquear
+    if (canvas) canvas.style.pointerEvents = 'none';
+    if (clearBtn) clearBtn.disabled = true;
+    if (wrap) wrap.style.outline = '2px solid var(--cnr-green)';
+  } else {
+    // Desbloquear
+    if (canvas) canvas.style.pointerEvents = 'auto';
+    if (clearBtn) clearBtn.disabled = false;
+    if (wrap) wrap.style.outline = 'none';
+  }
+});
+
+// Mostrar checkbox de bloqueo cuando hay firma
+window.addEventListener('cnr:firma-dibujada', () => {
+  const wrap = document.getElementById('cb_bloquear_firma_wrap');
+  if (wrap) wrap.style.display = 'flex';
+});
+  
 /* ── Service Worker ──────────────────────────────────── */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/CNR/service-worker.js')
