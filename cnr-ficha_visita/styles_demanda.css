@@ -158,11 +158,12 @@ body {
 
 /* En móvil vertical el sidebar flota sobre el header — agregar espacio superior */
 @media (max-width: 900px) {
-  .records-sidebar.mobile-visible .sidebar-header {
-    padding-top: 20px;
+  .records-sidebar {
+    top: 0;
+    padding-top: 0;
   }
-  .records-sidebar.mobile-visible .new-record-btn {
-    margin-top: 4px;
+  .records-sidebar.mobile-visible .sidebar-header {
+    padding-top: 96px;
   }
 }
 .sidebar-title { font-weight: 700; font-size: .95rem; color: var(--cnr-blue); }
